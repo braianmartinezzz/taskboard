@@ -1,0 +1,2697 @@
+<!DOCTYPE html>
+<html lang="es" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Taskboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --dur-instant:100ms; --dur-fast:140ms; --dur-base:180ms; --dur-slow:220ms;
+    --ease-out:cubic-bezier(.16,1,.3,1); --ease-in-out:cubic-bezier(.4,0,.2,1); --ease-standard:cubic-bezier(.2,0,0,1);
+  }
+  html[data-theme="dark"]{
+    --bg-page:#131417; --bg-sidebar:#0e0f11; --bg-panel:#232427; --bg-panel-alt:#2b2c30;
+    --bg-input:#2b2c30; --border:#34353a; --text:#e8eaed; --text-secondary:#9aa0a6; --text-tertiary:#6b6f76;
+    --accent:#669df6; --accent-dark:#8ab4f8; --accent-tint:rgba(102,157,246,.16);
+    --danger:#f28b82; --danger-tint:rgba(242,139,130,.14);
+    --status-progress:#f9ab00; --status-progress-tint:rgba(249,171,0,.16);
+    --success:#81c995; --success-tint:rgba(129,201,149,.18);
+    --shadow-1:0 1px 2px rgba(0,0,0,.5), 0 1px 3px rgba(0,0,0,.35);
+    --shadow-2:0 2px 6px rgba(0,0,0,.55), 0 6px 16px rgba(0,0,0,.4);
+    --shadow-lift:0 4px 10px rgba(0,0,0,.4), 0 1px 3px rgba(0,0,0,.4);
+    --shadow-drag:0 12px 28px rgba(0,0,0,.5), 0 3px 8px rgba(0,0,0,.4);
+    --overlay-bg:rgba(0,0,0,.6);
+  }
+  html[data-theme="light"]{
+    --bg-page:#f1f3f4; --bg-sidebar:#ffffff; --bg-panel:#ffffff; --bg-panel-alt:#f1f3f4;
+    --bg-input:#ffffff; --border:#dadce0; --text:#202124; --text-secondary:#5f6368; --text-tertiary:#80868b;
+    --accent:#1a73e8; --accent-dark:#1765cc; --accent-tint:#e8f0fe;
+    --danger:#d93025; --danger-tint:#fce8e6;
+    --status-progress:#e8710a; --status-progress-tint:#fef0e2;
+    --success:#1e8e3e; --success-tint:#e6f4ea;
+    --shadow-1:0 1px 2px 0 rgba(60,64,67,.3), 0 1px 3px 1px rgba(60,64,67,.15);
+    --shadow-2:0 1px 3px 0 rgba(60,64,67,.3), 0 4px 8px 3px rgba(60,64,67,.15);
+    --shadow-lift:0 2px 6px rgba(60,64,67,.2), 0 4px 12px rgba(60,64,67,.15);
+    --shadow-drag:0 8px 22px rgba(60,64,67,.28), 0 3px 8px rgba(60,64,67,.2);
+    --overlay-bg:rgba(32,33,36,.5);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;height:100%;}
+  body{
+    background:var(--bg-page); color:var(--text); font-family:'Google Sans','Roboto',Arial,sans-serif;
+    -webkit-font-smoothing:antialiased; overflow:hidden;
+  }
+  button,input,textarea{font-family:inherit; color:inherit;}
+  button{
+    background:none; border:none; margin:0; padding:0; cursor:pointer; text-align:inherit;
+    -webkit-appearance:none; appearance:none; transition:transform var(--dur-fast) var(--ease-out), background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out), opacity var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out);
+  }
+  button:active:not(:disabled){transform:scale(.96);}
+  button:disabled{opacity:.4; cursor:default;}
+  :focus-visible{outline:2px solid var(--accent); outline-offset:2px; transition:outline-offset var(--dur-instant) var(--ease-out);}
+  @media (prefers-reduced-motion: reduce){ *{animation:none !important; transition:none !important;} }
+
+  @keyframes popIn{ from{opacity:0; transform:scale(.94) translateY(-2px);} to{opacity:1; transform:scale(1) translateY(0);} }
+  @keyframes fadeInUp{ from{opacity:0; transform:translateY(4px);} to{opacity:1; transform:translateY(0);} }
+  @keyframes fadeIn{ from{opacity:0;} to{opacity:1;} }
+  @keyframes statusPulse{ 0%{transform:scale(1);} 40%{transform:scale(1.22);} 100%{transform:scale(1);} }
+  @keyframes celebrateRing{ 0%{box-shadow:0 0 0 0 var(--success-tint);} 100%{box-shadow:0 0 0 10px rgba(0,0,0,0);} }
+  @keyframes toastIn{ from{opacity:0; transform:translateY(10px) scale(.97);} to{opacity:1; transform:translateY(0) scale(1);} }
+  @keyframes spin{ to{transform:rotate(360deg);} }
+
+
+  .app-shell{display:flex; height:100vh; width:100vw;}
+
+  /* ---------- Sidebar ---------- */
+  .sidebar{
+    width:280px; flex-shrink:0; background:var(--bg-sidebar); border-right:1px solid var(--border);
+    display:flex; flex-direction:column; overflow:hidden; transition:width var(--dur-slow) var(--ease-standard);
+  }
+  .sidebar.collapsed{width:0; border-right:none;}
+  .sidebar-inner{width:280px; display:flex; flex-direction:column; height:100%; opacity:1; transition:opacity var(--dur-fast) var(--ease-out);}
+  .sidebar.collapsed .sidebar-inner{opacity:0;}
+  .sidebar-header{display:flex; align-items:center; gap:10px; padding:16px 16px 10px;}
+  .logo-mark{
+    width:32px; height:32px; border-radius:9px; flex-shrink:0;
+    background:var(--accent);
+    display:flex; align-items:center; justify-content:center;
+  }
+  .logo-mark svg{width:16px; height:16px; stroke:#fff; stroke-width:2.5; fill:none; stroke-linecap:round; stroke-linejoin:round;}
+  .sidebar-title{font-size:18px; font-weight:500;}
+  .create-wrap{position:relative; margin:6px 16px 14px;}
+  .create-btn{
+    background:var(--bg-panel-alt); border:1px solid var(--border); color:var(--text);
+    border-radius:20px; padding:10px 16px; font-size:14px; font-weight:500; cursor:pointer;
+    display:flex; align-items:center; gap:8px; width:100%;
+  }
+  .create-btn:hover{background:var(--bg-panel); border-color:var(--accent);}
+  .create-dropdown{
+    position:absolute; top:calc(100% + 6px); left:0; right:0; background:var(--bg-panel);
+    border:1px solid var(--border); border-radius:10px; box-shadow:var(--shadow-2); z-index:60; padding:6px; text-align:left;
+    transform-origin:top center; animation:popIn var(--dur-fast) var(--ease-out);
+  }
+  .create-dropdown .menu-item{padding:10px 12px;}
+
+  .nav-item{
+    display:flex; align-items:center; gap:12px; padding:9px 16px; margin:0 8px; border-radius:8px;
+    cursor:pointer; font-size:14px; color:var(--text); border:none; background:transparent; width:calc(100% - 16px);
+    text-align:left; font:inherit; position:relative;
+  }
+  .nav-item:hover{background:var(--bg-panel-alt);}
+  .nav-item.active{background:var(--accent-tint); color:var(--accent);}
+  .nav-item svg{flex-shrink:0;}
+  .nav-item .nav-label{flex:1;}
+  .nav-item .nav-count{font-size:12px; color:var(--text-secondary); transition:color var(--dur-fast) var(--ease-out);}
+  .nav-item.active .nav-count{color:var(--accent);}
+  .nav-list{padding:2px 0 10px;}
+
+  .section-pager{display:flex; flex-direction:column; flex:1; min-height:0;}
+  .pager-controls{display:flex; align-items:center; gap:2px; padding:4px 8px 6px;}
+  .pager-arrow{
+    width:28px; height:28px; border-radius:50%; border:none; background:transparent; color:var(--text-secondary);
+    display:flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0;
+    transition:opacity var(--dur-fast) var(--ease-out), background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
+  }
+  .pager-arrow:hover:not(:disabled){background:var(--bg-panel-alt); color:var(--text);}
+  .pager-arrow:disabled{opacity:.22; cursor:default;}
+  .pager-title-wrap{position:relative; flex:1; min-width:0; display:flex; justify-content:center;}
+  .pager-title-btn{
+    display:flex; align-items:center; gap:5px; max-width:100%; border:none; background:transparent; cursor:pointer;
+    padding:6px 8px; border-radius:8px; color:var(--text);
+  }
+  .pager-title-btn:hover{background:var(--bg-panel-alt);}
+  .pager-title-btn.open{background:var(--bg-panel-alt);}
+  .pager-title-text{
+    font-size:12px; font-weight:600; color:var(--text-secondary); text-transform:uppercase; letter-spacing:.5px;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  }
+  .pager-title-chevron{color:var(--text-tertiary); display:flex; flex-shrink:0; transition:transform var(--dur-fast) var(--ease-out);}
+  .pager-title-btn.open .pager-title-chevron{transform:rotate(180deg);}
+  .section-title-input{
+    font:inherit; font-weight:600; font-size:12px; text-transform:none; border:1px solid var(--accent);
+    border-radius:5px; padding:5px 7px; width:100%; outline:none; background:var(--bg-input); text-align:center;
+  }
+  .current-section-menu-btn{flex-shrink:0;}
+
+  .all-sections-dropdown{
+    position:absolute; top:calc(100% + 4px); left:0; right:0; background:var(--bg-panel);
+    border:1px solid var(--border); border-radius:10px; box-shadow:var(--shadow-2); z-index:60; padding:6px;
+    max-height:280px; overflow-y:auto; text-align:left;
+  }
+  .section-menu-item-row{display:flex; align-items:center; gap:8px; padding:8px 8px; border-radius:6px; cursor:pointer; border:none; background:none; font-family:inherit; width:100%; text-align:left;}
+  .section-menu-item-row:hover{background:var(--bg-panel-alt);}
+  .section-menu-item-row.active{background:var(--accent-tint); color:var(--accent);}
+  .section-menu-item-row.row-dragging{opacity:.4;}
+  .section-menu-item-row .sec-drag-handle{color:var(--text-tertiary); cursor:grab; display:flex; flex-shrink:0;}
+  .section-menu-item-row .sec-item-name{flex:1; font-size:13.5px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .section-menu-item-row .sec-item-count{font-size:11.5px; color:var(--text-secondary); flex-shrink:0;}
+  .section-menu-item-row.active .sec-item-count{color:var(--accent);}
+  .menu-divider{height:1px; background:var(--border); margin:6px 2px;}
+
+  .pager-viewport{flex:1; min-height:0; overflow:hidden; -webkit-overflow-scrolling:touch;}
+  .section-pager-body{
+    height:100%; overflow-y:auto; padding:2px 8px 8px; overscroll-behavior:contain; -webkit-overflow-scrolling:touch;
+    transition:transform var(--dur-base) var(--ease-out), opacity var(--dur-base) var(--ease-out);
+  }
+  .section-pager-body.pager-out-left{transform:translateX(-16px); opacity:0;}
+  .section-pager-body.pager-out-right{transform:translateX(16px); opacity:0;}
+  .section-pager-body.pager-in-from-right{transition:none !important; transform:translateX(16px); opacity:0;}
+  .section-pager-body.pager-in-from-left{transition:none !important; transform:translateX(-16px); opacity:0;}
+  .section-empty-hint{color:var(--text-tertiary); font-size:12.5px; text-align:center; padding:18px 12px;}
+  .empty-state{
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px;
+    text-align:center; padding:30px 18px; animation:fadeIn var(--dur-base) var(--ease-out);
+  }
+  .empty-state svg{color:var(--text-tertiary); opacity:.65;}
+  .empty-state .empty-title{font-size:13px; font-weight:600; color:var(--text-secondary);}
+  .empty-state .empty-desc{font-size:12px; color:var(--text-tertiary); max-width:230px; line-height:1.5;}
+  .icon-btn{
+    width:26px; height:26px; border-radius:50%; border:none; background:transparent; color:var(--text-secondary);
+    display:flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0;
+  }
+  .icon-btn:hover{background:var(--bg-panel);}
+  .section-menu-wrap, .list-menu-wrap{position:relative;}
+  .menu-dropdown{
+    position:absolute; right:0; top:28px; background:var(--bg-panel); border:1px solid var(--border);
+    border-radius:8px; box-shadow:var(--shadow-2); min-width:190px; z-index:60; padding:6px;
+  }
+  .menu-item{padding:9px 12px; font-size:13.5px; cursor:pointer; border-radius:6px; color:var(--text); border:none; background:none; font-family:inherit; display:block; width:100%; text-align:left;}
+  .menu-item:hover{background:var(--bg-panel-alt);}
+  .menu-item.danger{color:var(--danger);}
+
+  .list-row{
+    display:flex; align-items:center; gap:10px; padding:8px 8px 8px 26px; cursor:pointer; border-radius:8px;
+    margin:0 8px 1px; position:relative;
+  }
+  .list-row:hover{background:var(--bg-panel-alt);}
+  .list-row.selected{background:var(--accent-tint);}
+  .list-row.row-dragging{opacity:.35;}
+  .list-row:hover .list-menu-btn, .list-row:hover .list-drag-handle{opacity:1;}
+  .list-drag-handle{color:var(--text-tertiary); cursor:grab; opacity:0; display:flex; flex-shrink:0;}
+  .list-checkbox{
+    width:16px; height:16px; min-width:16px; border-radius:50%; border:2px solid var(--text-tertiary);
+    display:flex; align-items:center; justify-content:center; flex-shrink:0; background:transparent; padding:0;
+  }
+  .list-checkbox.checked{background:var(--accent); border-color:var(--accent);}
+  .list-checkbox svg{width:9px; height:9px; stroke:#fff; stroke-width:3.6; fill:none; opacity:0;}
+  .list-checkbox.checked svg{opacity:1;}
+  .list-name{
+    flex:1; font-size:13.6px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; cursor:text;
+    border:none; background:none; font-family:inherit; text-align:left; padding:0; color:var(--text); min-width:0;
+  }
+  .list-name-input{
+    flex:1; font:inherit; font-size:13.6px; border:1px solid var(--accent); border-radius:5px; padding:2px 5px;
+    outline:none; background:var(--bg-input); min-width:0;
+  }
+  .list-count{font-size:11.5px; color:var(--text-secondary); flex-shrink:0;}
+  .list-row.selected .list-count{color:var(--accent);}
+  .add-list-row{padding:8px 8px 10px 26px; margin:0 8px;}
+  .add-list-input{
+    width:100%; border:1px solid var(--accent); border-radius:7px; padding:7px 10px; font-size:13.5px;
+    outline:none; background:var(--bg-input);
+  }
+  .add-list-btn-row{
+    display:flex; align-items:center; gap:8px; padding:8px 8px 10px 26px; margin:0 8px; color:var(--text-secondary);
+    font-size:13px; cursor:pointer; border-radius:8px; border:none; background:none; font-family:inherit; width:calc(100% - 16px); text-align:left;
+  }
+  .add-list-btn-row:hover{background:var(--bg-panel-alt); color:var(--text);}
+
+  .add-section-row{
+    display:flex; align-items:center; gap:8px; padding:10px 16px; margin:6px 8px 0; color:var(--text-secondary);
+    font-size:13.5px; cursor:pointer; border-radius:8px; border:none; background:none; font-family:inherit; width:calc(100% - 16px); text-align:left;
+  }
+  .add-section-row:hover{background:var(--bg-panel-alt); color:var(--text);}
+  .add-section-input-wrap{padding:6px 16px; margin:6px 0 0;}
+  .add-section-input{
+    width:100%; border:1px solid var(--accent); border-radius:8px; padding:9px 12px; font-size:13.5px;
+    outline:none; background:var(--bg-input);
+  }
+
+  .sidebar-footer{border-top:1px solid var(--border); padding:6px;}
+  .settings-btn{
+    display:flex; align-items:center; gap:12px; padding:9px 10px; border-radius:8px; cursor:pointer;
+    font-size:13.6px; color:var(--text); border:none; background:transparent; width:100%; text-align:left;
+  }
+  .settings-btn:hover{background:var(--bg-panel-alt);}
+
+  .sidebar-backdrop{display:none;}
+
+  /* ---------- Main area ---------- */
+  .main-wrap{flex:1; min-width:0; display:flex; flex-direction:column; height:100vh;}
+  .topbar{
+    height:60px; flex-shrink:0; display:flex; align-items:center; gap:14px; padding:0 18px;
+    border-bottom:1px solid var(--border);
+  }
+  .search-wrap{position:relative; flex:1; max-width:440px;}
+  .search-wrap svg{position:absolute; left:13px; top:50%; transform:translateY(-50%); color:var(--text-secondary);}
+  .search-input{
+    width:100%; background:var(--bg-panel-alt); border:1px solid transparent; border-radius:22px;
+    padding:9px 14px 9px 40px; font-size:14px; outline:none; color:var(--text);
+  }
+  .search-input:focus{border-color:var(--accent); background:var(--bg-panel);}
+
+  .board{flex:1; overflow-x:auto; overflow-y:hidden; display:flex; gap:16px; padding:20px; align-items:flex-start;}
+  .board > .empty-state{margin:auto; max-width:320px;}
+
+  .column{
+    background:var(--bg-panel); border:1px solid var(--border); border-radius:12px; width:300px; flex-shrink:0;
+    display:flex; flex-direction:column; max-height:calc(100vh - 100px); box-shadow:var(--shadow-1);
+  }
+  .column-header{display:flex; align-items:center; gap:8px; padding:14px 8px 8px 16px;}
+  .column-title{font-weight:500; font-size:15px; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .count-badge{background:var(--bg-panel-alt); color:var(--text-secondary); font-size:11.5px; padding:2px 8px; border-radius:10px; flex-shrink:0;}
+
+  .add-task-btn{
+    color:var(--text-secondary); font-size:13.5px; padding:8px 16px 10px; cursor:pointer; display:flex;
+    align-items:center; gap:6px; border:none; background:transparent; width:100%; text-align:left;
+  }
+  .add-task-btn:hover{color:var(--accent);}
+  .add-task-form{margin:0 12px 10px; background:var(--bg-panel); border:1px solid var(--accent); border-radius:8px; padding:8px; box-shadow:var(--shadow-1);}
+  .add-task-form textarea{width:100%; border:none; outline:none; resize:none; font-family:inherit; font-size:13.8px; background:transparent; display:block;}
+  .add-task-form textarea[data-new-task-input]{min-height:20px;}
+  .add-task-form .add-task-notes{font-size:12.5px; color:var(--text-secondary); margin-top:4px; min-height:18px;}
+  .form-actions{display:flex; gap:8px; margin-top:6px;}
+  .btn-small-primary{background:var(--accent); color:#fff; border:none; border-radius:6px; padding:7px 14px; font-size:13px; font-weight:500; cursor:pointer;}
+  html[data-theme="dark"] .btn-small-primary{color:#131417;}
+  .btn-small-primary:hover{opacity:.9;}
+  .btn-text{background:none; border:none; color:var(--text-secondary); font-size:13px; padding:7px 10px; border-radius:6px; cursor:pointer; font-weight:500;}
+  .btn-text:hover{background:var(--bg-panel-alt);}
+
+  .task-list{flex:1; overflow-y:auto; padding:2px 8px 6px; display:flex; flex-direction:column; gap:3px;}
+  .task-list.list-drag-over{background:var(--accent-tint); border-radius:8px; transition:background var(--dur-fast) var(--ease-out);}
+  .drop-placeholder{
+    height:48px; border-radius:8px; border:2px dashed var(--accent); background:var(--accent-tint);
+    animation:placeholderIn var(--dur-fast) var(--ease-out); flex-shrink:0;
+  }
+  @keyframes placeholderIn{ from{opacity:0; transform:scaleY(.6);} to{opacity:1; transform:scaleY(1);} }
+  .empty-hint{color:var(--text-tertiary); font-size:12.5px; text-align:center; padding:16px 8px;}
+
+  .task-card{
+    border-radius:8px; padding:9px 10px 9px 15px; cursor:grab; position:relative;
+    user-select:none; -webkit-user-select:none;
+    transition:background var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out), opacity var(--dur-fast) var(--ease-out);
+  }
+  .task-drag-handle{
+    position:absolute; left:1px; top:10px; opacity:0; color:var(--text-tertiary); cursor:grab; display:flex;
+    padding:2px; border-radius:4px; transition:opacity var(--dur-fast) var(--ease-out), background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
+  }
+  .task-card:hover .task-drag-handle{opacity:1;}
+  .task-drag-handle:hover{background:var(--bg-panel); color:var(--text);}
+  .task-card:hover{background:var(--bg-panel-alt); transform:translateY(-1px); box-shadow:var(--shadow-1);}
+  .task-card:active{cursor:grabbing;}
+  .task-card.card-dragging{opacity:.3; transform:scale(.98);}
+  .task-card.completed .task-title{text-decoration:line-through; color:var(--text-secondary);}
+  .task-card.completing{animation:completedFlash var(--dur-slow) var(--ease-out);}
+  @keyframes completedFlash{ 0%{background:var(--success-tint); box-shadow:0 0 0 1px var(--success) inset;} 100%{background:transparent; box-shadow:none;} }
+  .task-card.entering{animation:fadeInUp var(--dur-base) var(--ease-out);}
+  .task-card.leaving{animation:fadeOutShrink var(--dur-fast) var(--ease-out) forwards;}
+  @keyframes fadeOutShrink{ from{opacity:1; transform:scale(1); max-height:200px; margin-bottom:3px;} to{opacity:0; transform:scale(.9); max-height:0; margin-bottom:0; padding-top:0; padding-bottom:0;} }
+  .color-bar{position:absolute; left:0; top:8px; bottom:8px; width:3px; border-radius:3px;}
+  .task-row{display:flex; gap:9px; align-items:flex-start;}
+  .status-dot{
+    width:17px; height:17px; min-width:17px; border-radius:50%; border:2px solid var(--text-tertiary); background:transparent;
+    margin-top:2px; cursor:pointer; display:flex; align-items:center; justify-content:center; padding:0; flex-shrink:0;
+    transition:background var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out);
+  }
+  .status-dot:hover{transform:scale(1.12);}
+  .status-dot.pulse{animation:statusPulse var(--dur-base) var(--ease-out);}
+  .status-dot .status-icon{width:9px; height:9px; opacity:0; transition:opacity var(--dur-fast) var(--ease-out);}
+  .status-dot .status-icon-check{stroke:#fff; stroke-width:3.6; fill:none;}
+  .status-dot .status-icon-progress{fill:var(--status-progress); stroke:none;}
+  .status-dot.status-in_progress{border-color:var(--status-progress); background:var(--status-progress-tint);}
+  .status-dot.status-in_progress .status-icon-progress{opacity:1;}
+  .status-dot.status-completed{background:var(--accent); border-color:var(--accent);}
+  .status-dot.status-completed .status-icon-check{opacity:1;}
+  html[data-theme="dark"] .status-dot.status-completed .status-icon-check{stroke:#131417;}
+  .status-chip{font-size:11px; font-weight:600; padding:3px 8px; border-radius:10px; color:var(--status-progress); background:var(--status-progress-tint); animation:fadeIn var(--dur-fast) var(--ease-out);}
+  .task-card.pending-delete{box-shadow:0 0 0 2px var(--danger) inset; background:var(--danger-tint); animation:shake .32s var(--ease-out);}
+  .task-card.pending-delete.leaving{animation:fadeOutShrink var(--dur-fast) var(--ease-out) forwards;}
+  @keyframes shake{ 10%,90%{transform:translateX(-1px);} 20%,80%{transform:translateX(2px);} 30%,50%,70%{transform:translateX(-3px);} 40%,60%{transform:translateX(3px);} }
+  .task-card:focus-visible{outline:2px solid var(--accent); outline-offset:-2px; background:var(--bg-panel-alt);}
+
+  .checkbox{
+    width:17px; height:17px; min-width:17px; border-radius:50%; border:2px solid var(--text-tertiary); background:transparent;
+    margin-top:2px; cursor:pointer; display:flex; align-items:center; justify-content:center; padding:0;
+    transition:background var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out);
+  }
+  .checkbox:hover{transform:scale(1.12);}
+  .checkbox.checked{background:var(--accent); border-color:var(--accent);}
+  .checkbox svg{width:9px; height:9px; stroke:#fff; stroke-width:3.6; fill:none; opacity:0; transition:opacity var(--dur-fast) var(--ease-out);}
+  html[data-theme="dark"] .checkbox.checked svg{stroke:#131417;}
+  .checkbox.checked svg{opacity:1;}
+  .task-title-row{flex:1; display:flex; align-items:center; gap:6px; min-width:0;}
+  .task-title{font-size:13.8px; line-height:19px; word-break:break-word; flex:1; transition:color var(--dur-fast) var(--ease-out);}
+  .star-btn{color:var(--text-tertiary); flex-shrink:0; display:flex; padding:2px; transition:color var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out);}
+  .star-btn:hover{transform:scale(1.15) rotate(-8deg); color:#f9ab00;}
+  .star-btn.starred{color:#f9ab00;}
+  .star-btn.starred.pulse{animation:statusPulse var(--dur-base) var(--ease-out);}
+  .task-notes{font-size:12.3px; color:var(--text-secondary); margin:2px 0 0 26px; word-break:break-word; max-height:88px; overflow:hidden;}
+
+  .md-content{line-height:1.55;}
+  .md-content h1,.md-content h2,.md-content h3,.md-content h4,.md-content h5,.md-content h6{font-weight:700; margin:.5em 0 .25em; line-height:1.3; color:var(--text);}
+  .md-content h1:first-child,.md-content h2:first-child,.md-content h3:first-child,.md-content p:first-child{margin-top:0;}
+  .md-content h1{font-size:1.35em;}
+  .md-content h2{font-size:1.22em;}
+  .md-content h3{font-size:1.1em;}
+  .md-content h4,.md-content h5,.md-content h6{font-size:1em;}
+  .md-content p{margin:0 0 .5em;}
+  .md-content p:last-child{margin-bottom:0;}
+  .md-content ul,.md-content ol{margin:.25em 0 .5em; padding-left:1.3em;}
+  .md-content li{margin:.15em 0;}
+  .md-content blockquote{margin:.4em 0; padding:1px 0 1px 10px; border-left:3px solid var(--border); color:var(--text-secondary);}
+  .md-content code{background:var(--bg-panel-alt); padding:1px 5px; border-radius:4px; font-family:ui-monospace,Menlo,Consolas,monospace; font-size:.92em;}
+  .md-content pre{background:var(--bg-panel-alt); padding:8px 10px; border-radius:8px; overflow-x:auto; margin:.4em 0;}
+  .md-content pre code{background:none; padding:0;}
+  .md-content hr{border:none; border-top:1px solid var(--border); margin:.6em 0;}
+  .md-content a{color:var(--accent); text-decoration:underline;}
+  .md-content strong{font-weight:700;}
+  .md-content em{font-style:italic;}
+  .md-content del{opacity:.6;}
+  .md-content .md-checklist{list-style:none; padding-left:0;}
+  .md-content .md-check-item{display:flex; align-items:flex-start; gap:6px;}
+  .md-content .md-checkbox{width:12px; height:12px; min-width:12px; margin-top:4px; border:1.5px solid var(--text-tertiary); border-radius:3px; display:inline-block;}
+  .md-content .md-check-item.checked .md-checkbox{background:var(--accent); border-color:var(--accent);}
+  .md-content .md-check-item.checked{text-decoration:line-through; color:var(--text-secondary);}
+  .task-meta{display:flex; gap:6px; margin:6px 0 0 26px; flex-wrap:wrap;}
+  .due-chip{font-size:11px; color:var(--text-secondary); background:var(--bg-panel-alt); padding:3px 8px 3px 6px; border-radius:10px; display:flex; align-items:center; gap:4px; font-weight:500;}
+  .due-chip svg{width:11px; height:11px;}
+  .due-chip.overdue{color:var(--danger); background:var(--danger-tint);}
+  .list-badge{font-size:10.5px; color:var(--text-secondary); background:var(--bg-panel-alt); padding:2px 7px; border-radius:8px; font-weight:500;}
+
+  .subtasks{margin:6px 0 0 26px; display:flex; flex-direction:column; gap:3px;}
+  .subtask-row{display:flex; gap:8px; align-items:flex-start; padding:2px 0;}
+  .subtask-row .checkbox{width:14px; height:14px; min-width:14px; margin-top:2px;}
+  .subtask-row .checkbox svg{width:7px; height:7px;}
+  .subtask-title{font-size:12.8px; line-height:17px; flex:1; word-break:break-word;}
+  .subtask-row.completed .subtask-title{text-decoration:line-through; color:var(--text-secondary);}
+  .subtask-notes{font-size:11.5px; color:var(--text-tertiary); margin:1px 0 0 22px; max-height:56px; overflow:hidden;}
+
+  .completed-toggle{
+    display:flex; align-items:center; gap:6px; padding:9px 16px; margin-top:2px; cursor:pointer;
+    font-size:12.5px; color:var(--text-secondary); border:none; border-top:1px solid var(--border);
+    background:none; font-family:inherit; width:100%; text-align:left;
+  }
+  .completed-toggle svg{transition:transform var(--dur-fast) var(--ease-out);}
+  .completed-toggle.expanded svg{transform:rotate(180deg);}
+  .completed-body{padding:0 8px 8px; display:flex; flex-direction:column; gap:3px;}
+
+  .col-remove-btn{color:var(--text-secondary); flex-shrink:0;}
+  .col-remove-btn:hover{color:var(--danger);}
+
+  /* ---------- Overlay / Modal ---------- */
+  .overlay{
+    position:fixed; inset:0; background:var(--overlay-bg); display:flex; align-items:center; justify-content:center; z-index:100; padding:16px;
+    backdrop-filter:blur(3px); -webkit-backdrop-filter:blur(3px);
+    animation:overlayIn var(--dur-fast) var(--ease-out);
+  }
+  .overlay.closing{animation:overlayOut var(--dur-fast) var(--ease-out) forwards;}
+  @keyframes overlayIn{ from{opacity:0;} to{opacity:1;} }
+  @keyframes overlayOut{ from{opacity:1;} to{opacity:0;} }
+  .modal{
+    background:var(--bg-panel); border:1px solid var(--border); border-radius:20px; width:460px; max-width:100%; padding:22px;
+    box-shadow:var(--shadow-2); max-height:88vh; overflow-y:auto; animation:modalIn var(--dur-base) var(--ease-out);
+  }
+  .overlay.closing .modal{animation:modalOut var(--dur-fast) var(--ease-out) forwards;}
+  @keyframes modalIn{ from{opacity:0; transform:scale(.95) translateY(6px);} to{opacity:1; transform:scale(1) translateY(0);} }
+  @keyframes modalOut{ from{opacity:1; transform:scale(1) translateY(0);} to{opacity:0; transform:scale(.96) translateY(4px);} }
+  .modal-header{display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;}
+  .modal-header h2{font-size:17px; font-weight:500; margin:0;}
+  .field-group{margin-bottom:15px;}
+  .field-label{font-size:11.5px; color:var(--text-secondary); margin-bottom:5px; display:block; font-weight:600; text-transform:uppercase; letter-spacing:.4px;}
+  .field-label-row{display:flex; align-items:center; justify-content:space-between; margin-bottom:5px;}
+  .field-label-row .field-label{margin-bottom:0;}
+  .field-label-action{
+    color:var(--text-tertiary); display:flex; align-items:center; gap:5px; padding:3px 7px; border-radius:6px;
+    font-size:11px; font-weight:600; text-transform:none; letter-spacing:0;
+  }
+  .field-label-action:hover{background:var(--bg-panel-alt); color:var(--text);}
+
+  .notes-fullscreen-modal{width:min(760px,92vw); height:min(640px,85vh); display:flex; flex-direction:column; padding:18px 18px 20px;}
+  .notes-fs-tabs{display:flex; gap:4px; margin-bottom:12px; background:var(--bg-panel-alt); border-radius:9px; padding:3px;}
+  .notes-fs-tab{flex:1; padding:8px; border-radius:7px; font-size:13px; font-weight:500; color:var(--text-secondary); text-align:center;}
+  .notes-fs-tab:hover{color:var(--text);}
+  .notes-fs-tab.active{background:var(--bg-panel); color:var(--text); box-shadow:var(--shadow-1);}
+  html[data-theme="light"] .notes-fs-tab.active{background:#fff;}
+  .notes-fs-body{flex:1; min-height:0; display:flex;}
+  .notes-fs-textarea{
+    flex:1; width:100%; height:100%; resize:none; border:1px solid var(--border); border-radius:10px; padding:16px;
+    font-size:14.5px; line-height:1.65; outline:none; background:var(--bg-input); color:var(--text); font-family:inherit;
+    scrollbar-width:thin; scrollbar-color:var(--border) transparent;
+  }
+  .notes-fs-textarea:focus{border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-tint);}
+  .notes-fs-textarea::-webkit-scrollbar{width:8px;}
+  .notes-fs-textarea::-webkit-scrollbar-thumb{background:var(--border); border-radius:8px;}
+  .notes-fs-preview{
+    flex:1; overflow-y:auto; padding:16px 18px; border:1px solid var(--border); border-radius:10px; font-size:14.5px;
+    scrollbar-width:thin; scrollbar-color:var(--border) transparent;
+  }
+  .notes-fs-preview::-webkit-scrollbar{width:8px;}
+  .notes-fs-preview::-webkit-scrollbar-thumb{background:var(--border); border-radius:8px;}
+  @media (max-width:640px){
+    .notes-fullscreen-modal{width:96vw; height:90vh;}
+  }
+  .field-input,.field-textarea{
+    width:100%; border:1px solid var(--border); border-radius:8px; padding:9px 11px; font-size:14px; outline:none;
+    background:var(--bg-input); color:var(--text); transition:border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out);
+  }
+  .field-input:focus,.field-textarea:focus{border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-tint);}
+  .field-textarea{resize:vertical; min-height:58px;}
+  .field-textarea.auto-resize{resize:none; scrollbar-width:thin; scrollbar-color:var(--border) transparent;}
+  .field-textarea.auto-resize::-webkit-scrollbar{width:8px;}
+  .field-textarea.auto-resize::-webkit-scrollbar-track{background:transparent;}
+  .field-textarea.auto-resize::-webkit-scrollbar-thumb{background:var(--border); border-radius:8px;}
+  .field-textarea.auto-resize::-webkit-scrollbar-thumb:hover{background:var(--text-tertiary);}
+  .search-input,.add-list-input,.add-section-input,.list-name-input,.section-title-input,.add-task-form textarea{
+    transition:border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out), background var(--dur-fast) var(--ease-out);
+  }
+  .swatch-row{display:flex; gap:9px; margin-top:2px; flex-wrap:wrap;}
+  .swatch{width:24px; height:24px; border-radius:50%; cursor:pointer; border:2px solid transparent; display:flex; align-items:center; justify-content:center; padding:0; font-family:inherit;}
+  .swatch.none{background:var(--bg-input); border:2px solid var(--border);}
+  .swatch.selected{border-color:var(--text);}
+  .swatch svg{width:12px; height:12px; stroke:#fff; stroke-width:3; fill:none; opacity:0;}
+  .swatch.selected svg{opacity:1;}
+  .swatch.none.selected svg{stroke:var(--text);}
+  .toggle-row{display:flex; align-items:center; gap:10px; margin-bottom:14px; cursor:pointer; background:none; border:none; padding:0; width:100%; text-align:left;}
+  .toggle-row span{font-size:13.6px;}
+
+  .status-options{display:flex; gap:8px;}
+  .status-option{
+    flex:1; border:1px solid var(--border); border-radius:10px; padding:10px 6px; text-align:center; cursor:pointer;
+    display:flex; flex-direction:column; align-items:center; gap:6px; font-size:12px; color:var(--text-secondary); background:var(--bg-input);
+    font-family:inherit;
+  }
+  .status-option .status-option-dot{width:14px; height:14px; border-radius:50%; border:2px solid var(--text-tertiary); display:flex; align-items:center; justify-content:center;}
+  .status-option .status-option-dot svg{width:8px; height:8px; opacity:0;}
+  .status-option[data-status-option="in_progress"] .status-option-dot{border-color:var(--status-progress);}
+  .status-option[data-status-option="in_progress"] .status-option-dot svg{opacity:1; fill:var(--status-progress); stroke:none;}
+  .status-option[data-status-option="completed"] .status-option-dot{border-color:var(--accent);}
+  .status-option[data-status-option="completed"] .status-option-dot svg{opacity:1; stroke:var(--accent); stroke-width:3.6; fill:none;}
+  .status-option.active{border-color:var(--accent); background:var(--accent-tint); color:var(--accent);}
+  .status-option.active[data-status-option="in_progress"]{border-color:var(--status-progress); background:var(--status-progress-tint); color:var(--status-progress);}
+
+  .subtask-edit-row{border:1px solid var(--border); border-radius:8px; padding:8px; margin-bottom:8px;}
+  .subtask-edit-top{display:flex; align-items:center; gap:8px;}
+  .subtask-edit-top input.field-input{padding:6px 9px; font-size:13.5px;}
+  .subtask-edit-notes{margin-top:6px;}
+  .subtask-edit-notes textarea{min-height:36px; font-size:12.5px; padding:6px 9px;}
+  .subtask-remove{color:var(--text-tertiary); flex-shrink:0;}
+  .subtask-remove:hover{color:var(--danger);}
+  .add-subtask-btn{
+    display:flex; align-items:center; gap:6px; color:var(--accent); font-size:13.3px; font-weight:500; cursor:pointer;
+    border:none; background:transparent; padding:6px 2px;
+  }
+
+  .modal-footer{display:flex; align-items:center; justify-content:space-between; margin-top:6px; gap:8px;}
+  .btn-danger-text{background:none; border:none; color:var(--danger); font-size:13.3px; font-weight:500; padding:9px 10px; border-radius:6px; cursor:pointer;}
+  .btn-danger-text:hover{background:var(--danger-tint);}
+  .footer-right{display:flex; gap:8px;}
+  .btn-secondary-text{background:none; border:none; color:var(--text-secondary); font-size:13.3px; font-weight:500; padding:9px 14px; border-radius:6px; cursor:pointer;}
+  .btn-secondary-text:hover{background:var(--bg-panel-alt);}
+  .btn-modal-primary{background:var(--accent); color:#fff; border:none; border-radius:20px; padding:9px 20px; font-size:13.3px; font-weight:500; cursor:pointer;}
+  html[data-theme="dark"] .btn-modal-primary{color:#131417;}
+
+  /* ---------- Settings ---------- */
+  .settings-section{margin-bottom:20px;}
+  .settings-section-title{font-size:11.5px; color:var(--text-secondary); font-weight:600; text-transform:uppercase; letter-spacing:.4px; margin-bottom:10px;}
+  .theme-options{display:flex; gap:8px;}
+  .theme-option{
+    flex:1; border:1px solid var(--border); border-radius:10px; padding:12px 8px; text-align:center; cursor:pointer;
+    display:flex; flex-direction:column; align-items:center; gap:6px; font-size:12.5px; color:var(--text-secondary);
+    background:none; font-family:inherit;
+  }
+  .theme-option svg{color:var(--text-secondary);}
+  .theme-option.active{border-color:var(--accent); background:var(--accent-tint); color:var(--accent);}
+  .theme-option.active svg{color:var(--accent);}
+  .danger-btn{
+    background:var(--danger-tint); color:var(--danger); border:1px solid transparent; border-radius:8px;
+    padding:10px 14px; font-size:13.5px; font-weight:500; cursor:pointer; width:100%; text-align:left; font-family:inherit;
+  }
+  .danger-btn:hover{opacity:.85;}
+
+  .data-actions-row{display:flex; gap:8px; margin-bottom:10px;}
+  .secondary-btn{
+    flex:1; background:var(--bg-panel-alt); color:var(--text); border:1px solid var(--border); border-radius:8px;
+    padding:10px 10px; font-size:13px; font-weight:500; cursor:pointer; text-align:center; font-family:inherit;
+  }
+  .secondary-btn:hover{background:var(--bg-input); border-color:var(--accent);}
+  .import-preview{
+    background:var(--bg-panel-alt); border:1px solid var(--border); border-radius:8px; padding:12px; margin-bottom:10px;
+    font-size:12.8px; color:var(--text); line-height:1.5;
+  }
+  .import-preview.error{background:var(--danger-tint); border-color:transparent; color:var(--danger);}
+  .import-preview-actions{display:flex; justify-content:flex-end; gap:8px; margin-top:10px;}
+  .import-preview-actions .danger-btn{width:auto; text-align:center; padding:8px 14px;}
+
+  .shortcuts-group-title{font-size:11px; font-weight:600; color:var(--text-secondary); text-transform:uppercase; letter-spacing:.4px; margin:16px 0 8px;}
+  .shortcuts-group-title:first-child{margin-top:0;}
+  .shortcut-row{display:flex; align-items:center; justify-content:space-between; gap:12px; padding:7px 0;}
+  .shortcut-row .shortcut-desc{font-size:13px; color:var(--text); flex:1;}
+  .shortcut-keys{display:flex; gap:4px; flex-shrink:0; align-items:center;}
+  .shortcut-keys .plus{color:var(--text-tertiary); font-size:11px;}
+  kbd.key{
+    display:inline-flex; align-items:center; justify-content:center; min-width:22px; height:22px; padding:0 6px;
+    background:var(--bg-panel-alt); border:1px solid var(--border); border-bottom-width:2px; border-radius:5px;
+    font-size:11.5px; font-family:inherit; font-weight:600; color:var(--text-secondary); box-sizing:border-box;
+  }
+
+  #toast-root{position:fixed; left:0; right:0; bottom:22px; display:flex; justify-content:center; z-index:200; pointer-events:none;}
+  .toast{
+    pointer-events:auto; display:flex; align-items:center; gap:14px; background:var(--bg-panel); color:var(--text);
+    border:1px solid var(--border); box-shadow:var(--shadow-2); border-radius:12px; padding:11px 12px 11px 16px;
+    font-size:13.5px; animation:toastIn var(--dur-base) var(--ease-out); max-width:calc(100vw - 32px);
+  }
+  .toast.closing{animation:toastOut var(--dur-fast) var(--ease-out) forwards;}
+  @keyframes toastOut{ from{opacity:1; transform:translateY(0) scale(1);} to{opacity:0; transform:translateY(8px) scale(.97);} }
+  .toast-msg{white-space:nowrap;}
+  .toast-action{
+    color:var(--accent); font-weight:600; font-size:13px; white-space:nowrap; padding:5px 10px; border-radius:7px;
+  }
+  .toast-action:hover{background:var(--accent-tint);}
+  .toast-close{color:var(--text-tertiary); display:flex; padding:4px; border-radius:50%; flex-shrink:0;}
+  .toast-close:hover{background:var(--bg-panel-alt); color:var(--text);}
+
+  @media (max-width:760px){
+    .sidebar{position:fixed; top:0; left:0; height:100vh; z-index:70; box-shadow:var(--shadow-2);}
+    .sidebar-backdrop.show{display:block; position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:65;}
+    .search-wrap{max-width:none;}
+  }
+</style>
+</head>
+<body>
+
+<div class="app-shell">
+  <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
+  <aside class="sidebar" id="sidebar"><div class="sidebar-inner" id="sidebar-inner"></div></aside>
+
+  <div class="main-wrap">
+    <div class="topbar">
+      <button class="icon-btn" id="hamburger-btn" aria-label="Mostrar/ocultar menú">
+        <svg viewBox="0 0 24 24" width="20" height="20"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M4 6h16M4 12h16M4 18h16"/></svg>
+      </button>
+      <div class="search-wrap">
+        <svg viewBox="0 0 24 24" width="17" height="17"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M21 21l-4.35-4.35M11 19a8 8 0 1 1 0-16 8 8 0 0 1 0 16Z"/></svg>
+        <input id="search-input" class="search-input" type="text" placeholder="Buscar tareas" autocomplete="off">
+      </div>
+    </div>
+    <div id="board" class="board"></div>
+  </div>
+</div>
+<div id="overlay-root"></div>
+<div id="toast-root"></div>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ---------------- Icons ---------------- */
+  var ICON = {
+    plus:'<svg viewBox="0 0 24 24" width="16" height="16"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M12 5v14M5 12h14"/></svg>',
+    x:'<svg viewBox="0 0 24 24" width="18" height="18"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M18 6L6 18M6 6l12 12"/></svg>',
+    dots:'<svg viewBox="0 0 24 24" width="16" height="16"><circle cx="12" cy="5" r="1.6" fill="currentColor"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/><circle cx="12" cy="19" r="1.6" fill="currentColor"/></svg>',
+    calendar:'<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path stroke="currentColor" stroke-width="2" d="M3 10h18M8 3v4M16 3v4"/></svg>',
+    star:'<svg viewBox="0 0 24 24" width="15" height="15"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" d="M12 3l2.6 5.6 6.1.6-4.6 4.1 1.3 6-5.4-3.1L6.6 19.3l1.3-6-4.6-4.1 6.1-.6L12 3Z"/></svg>',
+    starFilled:'<svg viewBox="0 0 24 24" width="15" height="15"><path fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linejoin="round" d="M12 3l2.6 5.6 6.1.6-4.6 4.1 1.3 6-5.4-3.1L6.6 19.3l1.3-6-4.6-4.1 6.1-.6L12 3Z"/></svg>',
+    gear:'<svg viewBox="0 0 24 24" width="17" height="17"><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="2"/><path fill="none" stroke="currentColor" stroke-width="2" d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.2a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.2a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.2a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.2a1.7 1.7 0 0 0-1.5 1Z"/></svg>',
+    trash:'<svg viewBox="0 0 24 24" width="15" height="15"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M4 7h16M9 7V4h6v3m-8 0 1 13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1l1-13"/></svg>',
+    grip:'<svg viewBox="0 0 24 24" width="13" height="13"><circle cx="9" cy="6" r="1.4" fill="currentColor"/><circle cx="15" cy="6" r="1.4" fill="currentColor"/><circle cx="9" cy="12" r="1.4" fill="currentColor"/><circle cx="15" cy="12" r="1.4" fill="currentColor"/><circle cx="9" cy="18" r="1.4" fill="currentColor"/><circle cx="15" cy="18" r="1.4" fill="currentColor"/></svg>',
+    check:'<svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>',
+    dotFilled:'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/></svg>',
+    emptyInbox:'<svg viewBox="0 0 24 24" width="34" height="34"><path fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" d="M4 12h4l2 3h4l2-3h4M4 12l1.4-6.4A2 2 0 0 1 7.36 4h9.28a2 2 0 0 1 1.96 1.6L20 12M4 12v6a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-6"/></svg>',
+    emptyDone:'<svg viewBox="0 0 24 24" width="34" height="34"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.6"/><path fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" d="M8 12.4l2.6 2.6L16 9.2"/></svg>',
+    expand:'<svg viewBox="0 0 24 24" width="14" height="14"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3m11-5v3a2 2 0 0 1-2 2h-3"/></svg>',
+    chevronDown:'<svg viewBox="0 0 24 24" width="16" height="16"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M6 9l6 6 6-6"/></svg>',
+    chevronLeft:'<svg viewBox="0 0 24 24" width="18" height="18"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M15 6l-6 6 6 6"/></svg>',
+    chevronRight:'<svg viewBox="0 0 24 24" width="18" height="18"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M9 6l6 6-6 6"/></svg>',
+    listIcon:'<svg viewBox="0 0 24 24" width="17" height="17"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>',
+    sun:'<svg viewBox="0 0 24 24" width="18" height="18"><circle cx="12" cy="12" r="4.5" fill="none" stroke="currentColor" stroke-width="2"/><path stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M12 2.5v2M12 19.5v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M2.5 12h2M19.5 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4"/></svg>',
+    moon:'<svg viewBox="0 0 24 24" width="18" height="18"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M20 14.5A8.5 8.5 0 1 1 9.5 4a7 7 0 0 0 10.5 10.5Z"/></svg>',
+    auto:'<svg viewBox="0 0 24 24" width="18" height="18"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path fill="currentColor" d="M12 3a9 9 0 0 0 0 18Z"/></svg>'
+  };
+
+  var COLORS = {
+    blue:'#4285f4', red:'#ea4335', yellow:'#f9ab00', green:'#34a853', purple:'#a142f4'
+  };
+
+  var STATUS_ORDER = ['not_started', 'in_progress', 'completed'];
+  var DUR_INSTANT = 100, DUR_FAST = 140, DUR_BASE = 180, DUR_SLOW = 220;
+  var STATUS_LABELS = {not_started:'Sin empezar', in_progress:'En progreso', completed:'Completada'};
+
+  var STORAGE_KEY = 'taskboard-lists-data';
+
+  /* ---------------- Helpers ---------------- */
+  function uid(prefix){ return prefix + '-' + Math.random().toString(36).slice(2,9); }
+  function todayISO(){ return new Date().toISOString().slice(0,10); }
+  function addDays(n){ var d = new Date(); d.setDate(d.getDate()+n); return d.toISOString().slice(0,10); }
+  function escapeHtml(str){
+    return String(str||'').replace(/[&<>"']/g, function(c){
+      return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+    });
+  }
+  function renderEmptyState(iconSvg, title, desc){
+    return '<div class="empty-state">' + iconSvg + '<div class="empty-title">' + escapeHtml(title) + '</div>' +
+      (desc ? '<div class="empty-desc">' + escapeHtml(desc) + '</div>' : '') + '</div>';
+  }
+
+  /* ---------------- Lightweight Markdown renderer (no dependencies, XSS-safe) ---------------- */
+  function mdInline(text){
+    var codeStore = [];
+    text = text.replace(/`([^`]+)`/g, function(m, code){
+      codeStore.push(code);
+      return '\u0000C' + (codeStore.length - 1) + '\u0000';
+    });
+    text = text.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+    text = text.replace(/__([^_]+)__/g, '<strong>$1</strong>');
+    text = text.replace(/\*([^*\n]+)\*/g, '<em>$1</em>');
+    text = text.replace(/(^|[^\w])_([^_\n]+)_(?!\w)/g, '$1<em>$2</em>');
+    text = text.replace(/~~([^~]+)~~/g, '<del>$1</del>');
+    text = text.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, function(m, label, url){
+      var safeUrl = /^(https?:|mailto:)/i.test(url) ? url : '#';
+      return '<a href="' + safeUrl + '" target="_blank" rel="noopener noreferrer">' + label + '</a>';
+    });
+    text = text.replace(/\u0000C(\d+)\u0000/g, function(m, idx){ return '<code>' + codeStore[idx] + '</code>'; });
+    return text;
+  }
+
+  function renderMarkdown(raw){
+    if(!raw) return '';
+    var lines = escapeHtml(raw).split('\n');
+    var html = '';
+    var listStack = [];
+    var paragraphBuffer = [];
+    var inCodeBlock = false;
+    var codeBuffer = [];
+
+    function closeLists(){ while(listStack.length){ html += '</' + listStack.pop() + '>'; } }
+    function flushParagraph(){
+      if(paragraphBuffer.length){ html += '<p>' + paragraphBuffer.join('<br>') + '</p>'; paragraphBuffer = []; }
+    }
+
+    for(var i = 0; i < lines.length; i++){
+      var line = lines[i];
+      var trimmed = line.trim();
+
+      if(/^```/.test(trimmed)){
+        if(!inCodeBlock){ flushParagraph(); closeLists(); inCodeBlock = true; codeBuffer = []; }
+        else { html += '<pre><code>' + codeBuffer.join('\n') + '</code></pre>'; inCodeBlock = false; }
+        continue;
+      }
+      if(inCodeBlock){ codeBuffer.push(line); continue; }
+
+      if(trimmed === ''){ flushParagraph(); closeLists(); continue; }
+
+      var hMatch = /^(#{1,6})\s+(.*)$/.exec(trimmed);
+      if(hMatch){
+        flushParagraph(); closeLists();
+        var level = hMatch[1].length;
+        html += '<h' + level + '>' + mdInline(hMatch[2]) + '</h' + level + '>';
+        continue;
+      }
+
+      if(/^(-{3,}|\*{3,}|_{3,})$/.test(trimmed)){
+        flushParagraph(); closeLists();
+        html += '<hr>';
+        continue;
+      }
+
+      var bqMatch = /^&gt;\s?(.*)$/.exec(trimmed);
+      if(bqMatch){
+        flushParagraph(); closeLists();
+        html += '<blockquote>' + mdInline(bqMatch[1]) + '</blockquote>';
+        continue;
+      }
+
+      var cbMatch = /^[-*+]\s+\[([ xX])\]\s+(.*)$/.exec(trimmed);
+      if(cbMatch){
+        flushParagraph();
+        if(listStack[listStack.length - 1] !== 'ul'){ closeLists(); html += '<ul class="md-checklist">'; listStack.push('ul'); }
+        var checked = cbMatch[1].toLowerCase() === 'x';
+        html += '<li class="md-check-item' + (checked ? ' checked' : '') + '"><span class="md-checkbox"></span><span>' + mdInline(cbMatch[2]) + '</span></li>';
+        continue;
+      }
+
+      var ulMatch = /^[-*+]\s+(.*)$/.exec(trimmed);
+      if(ulMatch){
+        flushParagraph();
+        if(listStack[listStack.length - 1] !== 'ul'){ closeLists(); html += '<ul>'; listStack.push('ul'); }
+        html += '<li>' + mdInline(ulMatch[1]) + '</li>';
+        continue;
+      }
+
+      var olMatch = /^\d+\.\s+(.*)$/.exec(trimmed);
+      if(olMatch){
+        flushParagraph();
+        if(listStack[listStack.length - 1] !== 'ol'){ closeLists(); html += '<ol>'; listStack.push('ol'); }
+        html += '<li>' + mdInline(olMatch[1]) + '</li>';
+        continue;
+      }
+
+      closeLists();
+      paragraphBuffer.push(mdInline(trimmed));
+    }
+
+    flushParagraph();
+    closeLists();
+    if(inCodeBlock && codeBuffer.length){ html += '<pre><code>' + codeBuffer.join('\n') + '</code></pre>'; }
+
+    return html;
+  }
+
+  function formatDueDate(iso){
+    if(!iso) return '';
+    var d = new Date(iso+'T00:00:00');
+    return d.toLocaleDateString('es-AR', {day:'numeric', month:'short'});
+  }
+  function isOverdue(iso){ return !!iso && iso < todayISO(); }
+  function cycleStatus(current){
+    var idx = STATUS_ORDER.indexOf(current);
+    if(idx === -1) idx = 0;
+    return STATUS_ORDER[(idx + 1) % STATUS_ORDER.length];
+  }
+
+  /* ---------------- Seed data ---------------- */
+  function seedState(){
+    var secListas = uid('sec'), secPersonal = uid('sec');
+    var lSemana = uid('list'), lMier = uid('list'), lCompras = uid('list'), lIdeas = uid('list');
+    return {
+      theme:'dark',
+      view:{ mode:'lists', selectedListIds:[lSemana, lMier], sidebarCollapsed:false, currentSectionId:secListas },
+      sections:[ {id:secListas, title:'Listas'}, {id:secPersonal, title:'Personal'} ],
+      lists:[
+        {id:lSemana, sectionId:secListas, title:'Semana'},
+        {id:lMier, sectionId:secListas, title:'Miércoles'},
+        {id:lCompras, sectionId:secListas, title:'Compra semanal'},
+        {id:lIdeas, sectionId:secPersonal, title:'Ideas'}
+      ],
+      tasks:[
+        {id:uid('t'), listId:lSemana, title:'Planificar semana y actualizar mes', notes:'', dueDate:null, color:null, starred:false, status:'not_started', subtasks:[]},
+        {id:uid('t'), listId:lSemana, title:'Desarrollar docs. de metas 2026', notes:'Tiempo ilimitado, ir sumando ideas de a poco.', dueDate:null, color:'yellow', starred:true, status:'in_progress', subtasks:[
+          {id:uid('st'), title:'Definir metas de cada área', notes:'', completed:true},
+          {id:uid('st'), title:'Revisar con alguien de confianza', notes:'Pedirle feedback antes de fin de mes.', completed:false}
+        ]},
+        {id:uid('t'), listId:lSemana, title:'Cortarme el pelo', notes:'', dueDate:addDays(3), color:null, starred:false, status:'not_started', subtasks:[]},
+        {id:uid('t'), listId:lSemana, title:'Armar el taskboard', notes:'', dueDate:null, color:'green', starred:false, status:'completed', subtasks:[]},
+        {id:uid('t'), listId:lMier, title:'Organización', notes:'Priorizar y si termino hacer tareas de la semana', dueDate:null, color:null, starred:false, status:'in_progress', subtasks:[
+          {id:uid('st'), title:'Decisiones importantes', notes:'¿En qué aspectos estoy bien y en cuáles mal?', completed:false},
+          {id:uid('st'), title:'Planificar mañana', notes:'', completed:false}
+        ]},
+        {id:uid('t'), listId:lMier, title:'Social', notes:'Mandar los mensajes pendientes.', dueDate:null, color:'purple', starred:false, status:'not_started', subtasks:[]},
+        {id:uid('t'), listId:lCompras, title:'Leche y huevos', notes:'', dueDate:null, color:null, starred:false, status:'not_started', subtasks:[]},
+        {id:uid('t'), listId:lIdeas, title:'Ideas para el cumpleaños', notes:'', dueDate:null, color:null, starred:false, status:'not_started', subtasks:[]}
+      ]
+    };
+  }
+
+  var state = null;
+  var ui = {
+    searchQuery:'', createMenuOpen:false, addingSection:false, addingListToSectionId:null, addingToListId:null,
+    editingListTitleId:null, openListMenuId:null, confirmDeleteListId:null, movingListId:null,
+    allSectionsMenuOpen:false, currentSectionMenuOpen:false, confirmDeleteCurrentSection:false, editingCurrentSectionTitle:false,
+    expandedCompletedListIds:{}, editingTaskId:null,
+    editingTaskDraft:null, confirmDeleteTask:false, settingsOpen:false, confirmResetData:false,
+    pendingDeleteTaskId:null, exportFeedback:null, pendingImportData:null, importError:null,
+    notesFullscreenOpen:false, notesFullscreenTab:'edit'
+  };
+  var pagerAnimating = false;
+  var pendingDeleteTimer = null;
+
+  /* Almacenamiento: usa window.storage dentro de Claude.ai; si el archivo se
+     abre por fuera (descargado, doble clic, otro hosting), esa API no existe,
+     así que se cae a localStorage del navegador y, si tampoco está disponible,
+     a memoria (funciona igual, pero no sobrevive a un refresh). */
+  var storageBackend = (function(){
+    if(window.storage && typeof window.storage.get === 'function' && typeof window.storage.set === 'function'){
+      return {
+        get: function(key){ return window.storage.get(key, false); },
+        set: function(key, value){ return window.storage.set(key, value, false); }
+      };
+    }
+    var hasLocalStorage = false;
+    try{
+      var testKey = '__taskboard_test__';
+      window.localStorage.setItem(testKey, '1');
+      window.localStorage.removeItem(testKey);
+      hasLocalStorage = true;
+    }catch(e){ hasLocalStorage = false; }
+
+    if(hasLocalStorage){
+      return {
+        get: function(key){
+          return new Promise(function(resolve, reject){
+            var v = window.localStorage.getItem(key);
+            if(v === null){ reject(new Error('not found')); } else { resolve({key:key, value:v}); }
+          });
+        },
+        set: function(key, value){
+          return new Promise(function(resolve){ window.localStorage.setItem(key, value); resolve({key:key, value:value}); });
+        }
+      };
+    }
+
+    var mem = {};
+    return {
+      get: function(key){
+        return new Promise(function(resolve, reject){
+          if(!(key in mem)){ reject(new Error('not found')); } else { resolve({key:key, value:mem[key]}); }
+        });
+      },
+      set: function(key, value){
+        return new Promise(function(resolve){ mem[key] = value; resolve({key:key, value:value}); });
+      }
+    };
+  })();
+
+  var saveTimer = null;
+  function persist(){
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(function(){
+      storageBackend.set(STORAGE_KEY, JSON.stringify(state)).catch(function(err){
+        console.error('No se pudo guardar el taskboard', err);
+      });
+    }, 150);
+  }
+
+  function migrateTasksStatus(tasks){
+    tasks.forEach(function(t){
+      if(!t.status){ t.status = t.completed ? 'completed' : 'not_started'; }
+      delete t.completed;
+    });
+  }
+
+  function loadState(){
+    return storageBackend.get(STORAGE_KEY).then(function(res){
+      if(res && res.value){
+        var parsed = JSON.parse(res.value);
+        if(parsed && Array.isArray(parsed.sections) && Array.isArray(parsed.lists) && Array.isArray(parsed.tasks)){
+          parsed.view = parsed.view || { mode:'lists', selectedListIds:[], sidebarCollapsed:false, currentSectionId:null };
+          parsed.theme = parsed.theme || 'dark';
+          migrateTasksStatus(parsed.tasks);
+          state = parsed;
+          return;
+        }
+      }
+      state = seedState();
+      persist();
+    }).catch(function(){
+      state = seedState();
+      persist();
+    });
+  }
+
+  function applyTheme(){
+    var t = state.theme;
+    if(t === 'auto'){
+      t = (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+    }
+    document.documentElement.setAttribute('data-theme', t);
+  }
+
+  /* ---------------- Generic ordered insert / drag helpers ---------------- */
+  function insertInto(array, item, keyField, keyValue, afterId){
+    item[keyField] = keyValue;
+    if(afterId){
+      var idx = array.findIndex(function(x){ return x.id === afterId; });
+      if(idx > -1){ array.splice(idx, 0, item); return; }
+    }
+    var lastIdx = -1;
+    array.forEach(function(x,i){ if(x[keyField] === keyValue) lastIdx = i; });
+    array.splice(lastIdx+1, 0, item);
+  }
+  function getDragAfterElementY(container, y, itemSelector, excludeEl){
+    var els = [].slice.call(container.querySelectorAll(itemSelector));
+    var closest = {offset:-Infinity, element:null};
+    els.forEach(function(child){
+      if(child === excludeEl) return;
+      var box = child.getBoundingClientRect();
+      var offset = y - box.top - box.height/2;
+      if(offset < 0 && offset > closest.offset){ closest = {offset:offset, element:child}; }
+    });
+    return closest.element;
+  }
+
+  /* ---------------- DOM refs ---------------- */
+  var sidebarEl = document.getElementById('sidebar');
+  var sidebarInner = document.getElementById('sidebar-inner');
+  var sidebarBackdrop = document.getElementById('sidebar-backdrop');
+  var boardEl = document.getElementById('board');
+  var overlayRoot = document.getElementById('overlay-root');
+
+  function captureScrollPositions(){
+    var positions = {};
+    document.querySelectorAll('[data-list-tasks]').forEach(function(el){
+      positions['list:' + el.getAttribute('data-list-tasks')] = el.scrollTop;
+    });
+    var pagerBody = document.getElementById('section-pager-body');
+    if(pagerBody) positions.sidebar = pagerBody.scrollTop;
+    if(boardEl) positions.board = boardEl.scrollLeft;
+    return positions;
+  }
+  function restoreScrollPositions(positions){
+    document.querySelectorAll('[data-list-tasks]').forEach(function(el){
+      var key = 'list:' + el.getAttribute('data-list-tasks');
+      if(key in positions) el.scrollTop = positions[key];
+    });
+    var pagerBody = document.getElementById('section-pager-body');
+    if(pagerBody && 'sidebar' in positions) pagerBody.scrollTop = positions.sidebar;
+    if(boardEl && 'board' in positions) boardEl.scrollLeft = positions.board;
+  }
+
+  function render(){
+    var scrollPositions = captureScrollPositions();
+    renderSidebar();
+    renderBoard();
+    renderOverlay();
+    wireSidebarInputs();
+    wireBoardInputs();
+    restoreScrollPositions(scrollPositions);
+  }
+
+  /* ================= SIDEBAR ================= */
+  function totalActiveCount(){ return state.tasks.filter(function(t){ return t.status !== 'completed'; }).length; }
+  function starredActiveCount(){ return state.tasks.filter(function(t){ return t.status !== 'completed' && t.starred; }).length; }
+  function listActiveCount(listId){ return state.tasks.filter(function(t){ return t.listId === listId && t.status !== 'completed'; }).length; }
+  function listCountForSection(sectionId){ return state.lists.filter(function(l){ return l.sectionId === sectionId; }).length; }
+  function getSectionIndex(id){ return state.sections.findIndex(function(s){ return s.id === id; }); }
+  function currentSection(){
+    if(state.sections.length === 0) return null;
+    var idx = getSectionIndex(state.view.currentSectionId);
+    if(idx === -1){ state.view.currentSectionId = state.sections[0].id; idx = 0; }
+    return state.sections[idx];
+  }
+
+  function renderSidebar(){
+    sidebarEl.className = 'sidebar' + (state.view.sidebarCollapsed ? ' collapsed' : '');
+    sidebarBackdrop.className = 'sidebar-backdrop' + (state.view.sidebarCollapsed ? '' : ' show');
+
+    var html = '';
+    html += '<div class="sidebar-header"><div class="logo-mark"><svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg></div><div class="sidebar-title">Taskboard</div></div>';
+
+    html += '<div class="create-wrap">';
+    html += '<button class="create-btn" id="create-btn">' + ICON.plus + ' Crear</button>';
+    if(ui.createMenuOpen){
+      html += '<div class="create-dropdown">';
+      html += '<button type="button" class="menu-item" id="create-task-opt">Nueva tarea</button>';
+      html += '<button type="button" class="menu-item" id="create-section-opt">Nueva sección</button>';
+      html += '</div>';
+    }
+    html += '</div>';
+
+    html += '<div class="nav-list">';
+    html += '<button type="button" class="nav-item' + (state.view.mode === 'all' ? ' active' : '') + '" id="nav-all">' + ICON.listIcon + '<span class="nav-label">Todas las tareas</span><span class="nav-count">' + totalActiveCount() + '</span></button>';
+    html += '<button type="button" class="nav-item' + (state.view.mode === 'starred' ? ' active' : '') + '" id="nav-starred">' + ICON.star + '<span class="nav-label">Destacadas</span><span class="nav-count">' + starredActiveCount() + '</span></button>';
+    html += '</div>';
+
+    html += renderSectionPager();
+
+    if(ui.addingSection){
+      html += '<div class="add-section-input-wrap"><input class="add-section-input" id="new-section-input" placeholder="Nombre de la sección" maxlength="40"></div>';
+    }else{
+      html += '<button type="button" class="add-section-row" id="add-section-row">' + ICON.plus + ' Nueva sección</button>';
+    }
+
+    html += '<div class="sidebar-footer"><button class="settings-btn" id="settings-btn">' + ICON.gear + ' Configuración</button></div>';
+
+    sidebarInner.innerHTML = html;
+
+    if(ui.editingCurrentSectionTitle){
+      var cst = document.getElementById('current-section-title-input');
+      if(cst){ cst.focus(); cst.select(); }
+    }
+    if(ui.addingListToSectionId){
+      var nl = document.getElementById('new-list-input');
+      if(nl){ nl.focus(); }
+    }
+    if(ui.addingSection){
+      var ns = document.getElementById('new-section-input');
+      if(ns){ ns.focus(); }
+    }
+  }
+
+  function renderPagerControlsInner(sec, idx){
+    var canPrev = idx > 0;
+    var canNext = idx < state.sections.length - 1;
+    var html = '';
+    html += '<button class="pager-arrow" id="sec-prev-btn"' + (canPrev ? '' : ' disabled') + ' aria-label="Sección anterior">' + ICON.chevronLeft + '</button>';
+    html += '<div class="pager-title-wrap">';
+    if(ui.editingCurrentSectionTitle){
+      html += '<input class="section-title-input" id="current-section-title-input" value="' + escapeHtml(sec.title) + '" maxlength="40">';
+    }else{
+      html += '<button class="pager-title-btn' + (ui.allSectionsMenuOpen ? ' open' : '') + '" id="pager-title-btn" title="Ver todas las secciones">';
+      html += '<span class="pager-title-text">' + escapeHtml(sec.title) + '</span>';
+      html += '<span class="pager-title-chevron">' + ICON.chevronDown + '</span>';
+      html += '</button>';
+      if(ui.allSectionsMenuOpen){ html += renderAllSectionsDropdown(); }
+    }
+    html += '</div>';
+    html += '<button class="pager-arrow" id="sec-next-btn"' + (canNext ? '' : ' disabled') + ' aria-label="Sección siguiente">' + ICON.chevronRight + '</button>';
+    html += '<div class="current-section-menu-btn section-menu-wrap">';
+    html += '<button class="icon-btn" id="current-section-menu-toggle" title="Más opciones de esta sección">' + ICON.dots + '</button>';
+    if(ui.currentSectionMenuOpen){
+      html += '<div class="menu-dropdown">';
+      html += '<button type="button" class="menu-item" id="current-section-rename-trigger">Cambiar nombre</button>';
+      if(ui.confirmDeleteCurrentSection){
+        html += '<button type="button" class="menu-item danger" id="current-section-confirm-delete">Eliminar y borrar sus listas</button>';
+      }else{
+        html += '<button type="button" class="menu-item danger" id="current-section-delete-trigger">Eliminar sección</button>';
+      }
+      html += '</div>';
+    }
+    html += '</div>';
+    return html;
+  }
+
+  function renderSectionPager(){
+    if(state.sections.length === 0){
+      return '<div class="section-pager">' + renderEmptyState(ICON.emptyInbox, 'Sin secciones todavía', 'Creá una para empezar a organizar tus listas.') + '</div>';
+    }
+    var sec = currentSection();
+    var idx = getSectionIndex(sec.id);
+    var html = '<div class="section-pager">';
+    html += '<div class="pager-controls" id="pager-controls">' + renderPagerControlsInner(sec, idx) + '</div>';
+    html += '<div class="pager-viewport"><div class="section-pager-body" id="section-pager-body">' + renderSectionBodyInner(sec) + '</div></div>';
+    html += '</div>';
+    return html;
+  }
+
+  function renderSectionBodyInner(sec){
+    if(!sec) return '';
+    var lists = state.lists.filter(function(l){ return l.sectionId === sec.id; });
+    var html = '';
+    lists.forEach(function(list){
+      var selected = state.view.mode === 'lists' && state.view.selectedListIds.indexOf(list.id) > -1;
+      html += '<div class="list-row' + (selected ? ' selected' : '') + '" draggable="true" data-list-drag="' + list.id + '" data-list-id="' + list.id + '">';
+      html += '<span class="list-drag-handle">' + ICON.grip + '</span>';
+      html += '<button type="button" class="list-checkbox' + (selected ? ' checked' : '') + '" data-toggle-list="' + list.id + '" aria-label="Seleccionar lista">' + ICON.check + '</button>';
+      if(ui.editingListTitleId === list.id){
+        html += '<input class="list-name-input" data-rename-list="' + list.id + '" value="' + escapeHtml(list.title) + '" maxlength="40">';
+      }else{
+        html += '<button type="button" class="list-name" data-select-list="' + list.id + '">' + escapeHtml(list.title) + '</button>';
+        html += '<span class="list-count">' + listActiveCount(list.id) + '</span>';
+      }
+      html += '<div class="list-menu-wrap">';
+      html += '<button class="icon-btn list-menu-btn" data-toggle-list-menu="' + list.id + '" title="Más opciones">' + ICON.dots + '</button>';
+      if(ui.openListMenuId === list.id){
+        html += '<div class="menu-dropdown">';
+        if(ui.movingListId === list.id){
+          html += '<button type="button" class="menu-item" data-move-list-back="' + list.id + '">' + ICON.chevronLeft + ' Volver</button>';
+          html += '<div class="menu-divider"></div>';
+          var others = state.sections.filter(function(s){ return s.id !== sec.id; });
+          if(others.length === 0){
+            html += '<div class="menu-item" style="color:var(--text-tertiary); cursor:default;">No hay otra sección</div>';
+          }else{
+            others.forEach(function(other){
+              html += '<button type="button" class="menu-item" data-move-list-to="' + list.id + '|' + other.id + '">' + escapeHtml(other.title) + '</button>';
+            });
+          }
+        }else{
+          html += '<button type="button" class="menu-item" data-rename-list-trigger="' + list.id + '">Cambiar nombre</button>';
+          if(state.sections.length > 1){
+            html += '<button type="button" class="menu-item" data-move-list-trigger="' + list.id + '">Mover a otra sección</button>';
+          }
+          if(ui.confirmDeleteListId === list.id){
+            html += '<button type="button" class="menu-item danger" data-confirm-delete-list="' + list.id + '">Eliminar y borrar tareas</button>';
+          }else{
+            html += '<button type="button" class="menu-item danger" data-delete-list="' + list.id + '">Eliminar lista</button>';
+          }
+        }
+        html += '</div>';
+      }
+      html += '</div>';
+      html += '</div>';
+    });
+
+    var addControl;
+    if(ui.addingListToSectionId === sec.id){
+      addControl = '<div class="add-list-row"><input class="add-list-input" id="new-list-input" placeholder="Nombre de la lista" maxlength="40"></div>';
+    }else{
+      addControl = '<button type="button" class="add-list-btn-row" data-add-list-to="' + sec.id + '">' + ICON.plus + ' Añadir lista</button>';
+    }
+
+    if(lists.length === 0){
+      html += '<div class="section-empty-hint">Todavía no hay listas acá.</div>';
+    }
+    html += addControl;
+    return html;
+  }
+
+  function renderAllSectionsDropdown(){
+    var html = '<div class="all-sections-dropdown" id="all-sections-dropdown">';
+    state.sections.forEach(function(s){
+      var active = s.id === state.view.currentSectionId;
+      html += '<button type="button" class="section-menu-item-row' + (active ? ' active' : '') + '" draggable="true" data-sec-drag="' + s.id + '" data-sec-id="' + s.id + '" data-jump-section="' + s.id + '">';
+      html += '<span class="sec-drag-handle">' + ICON.grip + '</span>';
+      html += '<span class="sec-item-name">' + escapeHtml(s.title) + '</span>';
+      html += '<span class="sec-item-count">' + listCountForSection(s.id) + '</span>';
+      html += '</button>';
+    });
+    html += '<div class="menu-divider"></div>';
+    html += '<button type="button" class="menu-item" id="dropdown-add-section-opt">' + ICON.plus + ' Nueva sección</button>';
+    html += '</div>';
+    return html;
+  }
+
+  function updatePagerControlsInPlace(){
+    var el = document.getElementById('pager-controls');
+    var sec = currentSection();
+    if(!el || !sec) return;
+    el.innerHTML = renderPagerControlsInner(sec, getSectionIndex(sec.id));
+  }
+
+  function goToSection(targetId, forcedDirection){
+    if(!targetId || targetId === state.view.currentSectionId || pagerAnimating) return;
+    var curIdx = getSectionIndex(state.view.currentSectionId);
+    var tgtIdx = getSectionIndex(targetId);
+    if(tgtIdx === -1) return;
+    var direction = forcedDirection || (tgtIdx > curIdx ? 'next' : 'prev');
+    var body = document.getElementById('section-pager-body');
+    if(!body){
+      state.view.currentSectionId = targetId; persist(); render(); return;
+    }
+    pagerAnimating = true;
+    ui.allSectionsMenuOpen = false;
+    ui.currentSectionMenuOpen = false;
+    ui.confirmDeleteCurrentSection = false;
+    ui.editingCurrentSectionTitle = false;
+    ui.addingListToSectionId = null;
+    ui.openListMenuId = null;
+    ui.movingListId = null;
+    body.classList.add(direction === 'next' ? 'pager-out-left' : 'pager-out-right');
+    window.setTimeout(function(){
+      state.view.currentSectionId = targetId;
+      persist();
+      updatePagerControlsInPlace();
+      var sec = currentSection();
+      body.innerHTML = renderSectionBodyInner(sec);
+      wireSidebarInputs();
+      body.className = 'section-pager-body ' + (direction === 'next' ? 'pager-in-from-right' : 'pager-in-from-left');
+      void body.offsetWidth;
+      requestAnimationFrame(function(){
+        body.className = 'section-pager-body';
+        window.setTimeout(function(){ pagerAnimating = false; }, DUR_BASE + 20);
+      });
+    }, DUR_BASE);
+  }
+
+  /* ================= BOARD ================= */
+  function matchesSearch(task){
+    var q = ui.searchQuery.trim().toLowerCase();
+    if(!q) return true;
+    if((task.title||'').toLowerCase().indexOf(q) > -1) return true;
+    if((task.notes||'').toLowerCase().indexOf(q) > -1) return true;
+    return (task.subtasks||[]).some(function(s){
+      return (s.title||'').toLowerCase().indexOf(q) > -1 || (s.notes||'').toLowerCase().indexOf(q) > -1;
+    });
+  }
+
+  function renderBoard(){
+    var html = '';
+
+    if(state.view.mode === 'all' || state.view.mode === 'starred'){
+      var tasks = state.tasks.filter(function(t){
+        if(t.status === 'completed') return false;
+        if(state.view.mode === 'starred' && !t.starred) return false;
+        return matchesSearch(t);
+      });
+      var title = state.view.mode === 'all' ? 'Todas las tareas' : 'Destacadas';
+      html += '<div class="column">';
+      html += '<div class="column-header"><span class="column-title">' + title + '</span><span class="count-badge">' + tasks.length + '</span></div>';
+      html += '<div class="task-list">';
+      tasks.forEach(function(t){ html += renderTaskCard(t, true); });
+      if(tasks.length === 0){
+        if(ui.searchQuery.trim()){
+          html += '<div class="empty-hint">Sin resultados para "' + escapeHtml(ui.searchQuery.trim()) + '"</div>';
+        } else if(state.view.mode === 'starred'){
+          html += renderEmptyState(ICON.emptyDone, 'Sin destacadas', 'Marcá tareas con la estrella para verlas acá.');
+        } else {
+          html += renderEmptyState(ICON.emptyDone, '¡Estás al día!', 'No tenés tareas pendientes.');
+        }
+      }
+      html += '</div></div>';
+    } else {
+      var ids = state.view.selectedListIds.filter(function(id){ return state.lists.some(function(l){ return l.id === id; }); });
+      if(ids.length === 0){
+        html += renderEmptyState(ICON.emptyInbox, 'Nada para mostrar', 'Elegí una o más listas en el menú de la izquierda para ver sus tareas acá.');
+      } else {
+        ids.forEach(function(listId){
+          var list = state.lists.find(function(l){ return l.id === listId; });
+          if(!list) return;
+          html += renderListColumn(list);
+        });
+      }
+    }
+
+    boardEl.innerHTML = html;
+  }
+
+  function renderListColumn(list){
+    var all = state.tasks.filter(function(t){ return t.listId === list.id && matchesSearch(t); });
+    var active = all.filter(function(t){ return t.status !== 'completed'; });
+    var done = all.filter(function(t){ return t.status === 'completed'; });
+    var expanded = !!ui.expandedCompletedListIds[list.id];
+
+    var html = '<div class="column" data-col-list="' + list.id + '">';
+    html += '<div class="column-header"><span class="column-title">' + escapeHtml(list.title) + '</span><span class="count-badge">' + active.length + '</span>';
+    html += '<button class="icon-btn col-remove-btn" data-remove-from-view="' + list.id + '" title="Quitar de la vista">' + ICON.x + '</button>';
+    html += '</div>';
+
+    if(ui.addingToListId === list.id){
+      html += '<div class="add-task-form"><textarea data-new-task-input="' + list.id + '" placeholder="Título de la tarea" rows="1"></textarea>';
+      html += '<textarea class="add-task-notes auto-resize" data-new-task-notes="' + list.id + '" placeholder="Notas (opcional)" rows="1"></textarea>';
+      html += '<div class="form-actions"><button class="btn-small-primary" data-submit-task="' + list.id + '">Añadir tarea</button><button class="btn-text" data-cancel-task="' + list.id + '">Cancelar</button></div></div>';
+    }else{
+      html += '<button class="add-task-btn" data-add-task="' + list.id + '">' + ICON.plus + ' Añadir tarea</button>';
+    }
+
+    html += '<div class="task-list" data-list-tasks="' + list.id + '">';
+    active.forEach(function(t){ html += renderTaskCard(t, false); });
+    if(active.length === 0){
+      if(ui.searchQuery.trim()){
+        html += '<div class="empty-hint">Sin resultados</div>';
+      } else if(done.length > 0){
+        html += renderEmptyState(ICON.emptyDone, '¡Todo listo!', 'Completaste todas las tareas de esta lista.');
+      } else {
+        html += renderEmptyState(ICON.emptyInbox, 'Sin tareas', 'Agregá la primera con el botón de arriba.');
+      }
+    }
+    html += '</div>';
+
+    if(done.length > 0){
+      html += '<button type="button" class="completed-toggle' + (expanded ? ' expanded' : '') + '" data-toggle-completed="' + list.id + '"><span>Completadas (' + done.length + ')</span>' + ICON.chevronDown + '</button>';
+      if(expanded){
+        html += '<div class="completed-body">';
+        done.forEach(function(t){ html += renderTaskCard(t, false); });
+        html += '</div>';
+      }
+    }
+
+    html += '</div>';
+    return html;
+  }
+
+  function renderTaskCard(t, showListBadge){
+    var color = t.color && COLORS[t.color] ? COLORS[t.color] : null;
+    var statusLabel = STATUS_LABELS[t.status] || 'Sin empezar';
+    var html = '<div class="task-card' + (t.status === 'completed' ? ' completed' : '') + (ui.pendingDeleteTaskId === t.id ? ' pending-delete' : '') + '" draggable="true" data-task-id="' + t.id + '" data-open-task="' + t.id + '" tabindex="0">';
+    html += '<span class="task-drag-handle" aria-hidden="true">' + ICON.grip + '</span>';
+    if(color){ html += '<div class="color-bar" style="background:' + color + '"></div>'; }
+    html += '<div class="task-row">';
+    html += '<button class="status-dot status-' + t.status + '" data-cycle-status="' + t.id + '" aria-label="Estado: ' + statusLabel + '. Tocar para cambiar de estado.">';
+    html += '<svg class="status-icon status-icon-check" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>';
+    html += '<svg class="status-icon status-icon-progress" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/></svg>';
+    html += '</button>';
+    html += '<div class="task-title-row"><span class="task-title" data-open-task="' + t.id + '">' + escapeHtml(t.title) + '</span>';
+    if(t.starred){ html += '<button class="star-btn starred" data-toggle-star="' + t.id + '" aria-label="Quitar de destacadas">' + ICON.starFilled + '</button>'; }
+    html += '</div></div>';
+    if(t.notes){ html += '<div class="task-notes md-content" data-open-task="' + t.id + '">' + renderMarkdown(t.notes) + '</div>'; }
+
+    var metaBits = '';
+    if(t.status === 'in_progress'){ metaBits += '<span class="status-chip">En curso</span>'; }
+    if(t.dueDate){
+      var overdue = isOverdue(t.dueDate) && t.status !== 'completed';
+      metaBits += '<span class="due-chip' + (overdue ? ' overdue' : '') + '">' + ICON.calendar + ' ' + formatDueDate(t.dueDate) + '</span>';
+    }
+    if(showListBadge){
+      var l = state.lists.find(function(x){ return x.id === t.listId; });
+      if(l){ metaBits += '<span class="list-badge">' + escapeHtml(l.title) + '</span>'; }
+    }
+    if(metaBits){ html += '<div class="task-meta" data-open-task="' + t.id + '">' + metaBits + '</div>'; }
+
+    if(t.subtasks && t.subtasks.length){
+      html += '<div class="subtasks">';
+      t.subtasks.forEach(function(s){
+        html += '<div class="subtask-row' + (s.completed ? ' completed' : '') + '">';
+        html += '<button class="checkbox' + (s.completed ? ' checked' : '') + '" data-toggle-subtask="' + t.id + '|' + s.id + '" aria-label="Marcar subtarea como completada">' + ICON.check + '</button>';
+        html += '<div style="flex:1;min-width:0;" data-open-task="' + t.id + '"><span class="subtask-title">' + escapeHtml(s.title) + '</span>';
+        if(s.notes){ html += '<div class="subtask-notes md-content">' + renderMarkdown(s.notes) + '</div>'; }
+        html += '</div></div>';
+      });
+      html += '</div>';
+    }
+
+    html += '</div>';
+    return html;
+  }
+
+  /* ================= MUTATIONS: sections/lists ================= */
+  function addSection(title){
+    title = title.trim();
+    if(!title) return;
+    var sec = {id:uid('sec'), title:title};
+    state.sections.push(sec);
+    state.view.currentSectionId = sec.id;
+    persist();
+  }
+  function renameSection(id, title){
+    title = title.trim();
+    var sec = state.sections.find(function(s){ return s.id === id; });
+    if(sec && title) sec.title = title;
+    persist();
+  }
+  function deleteSection(id){
+    var listIds = state.lists.filter(function(l){ return l.sectionId === id; }).map(function(l){ return l.id; });
+    state.tasks = state.tasks.filter(function(t){ return listIds.indexOf(t.listId) === -1; });
+    state.lists = state.lists.filter(function(l){ return l.sectionId !== id; });
+    state.sections = state.sections.filter(function(s){ return s.id !== id; });
+    state.view.selectedListIds = state.view.selectedListIds.filter(function(id2){ return listIds.indexOf(id2) === -1; });
+    persist();
+  }
+  function addList(sectionId, title){
+    title = title.trim();
+    if(!title) return;
+    var list = {id:uid('list'), sectionId:sectionId, title:title};
+    state.lists.push(list);
+    persist();
+    return list;
+  }
+  function renameList(id, title){
+    title = title.trim();
+    var list = state.lists.find(function(l){ return l.id === id; });
+    if(list && title) list.title = title;
+    persist();
+  }
+  function deleteList(id){
+    state.tasks = state.tasks.filter(function(t){ return t.listId !== id; });
+    state.lists = state.lists.filter(function(l){ return l.id !== id; });
+    state.view.selectedListIds = state.view.selectedListIds.filter(function(x){ return x !== id; });
+    persist();
+  }
+  function toggleListSelected(id){
+    state.view.mode = 'lists';
+    var idx = state.view.selectedListIds.indexOf(id);
+    if(idx > -1){ state.view.selectedListIds.splice(idx,1); }
+    else { state.view.selectedListIds.push(id); }
+    persist();
+  }
+  function moveListToSection(listId, targetSectionId){
+    var list = state.lists.find(function(l){ return l.id === listId; });
+    if(!list) return;
+    list.sectionId = targetSectionId;
+    persist();
+  }
+  function deleteCurrentSectionAction(){
+    var sec = currentSection();
+    if(!sec) return;
+    var idx = getSectionIndex(sec.id);
+    deleteSection(sec.id);
+    if(state.sections.length > 0){
+      var newIdx = Math.min(idx, state.sections.length - 1);
+      state.view.currentSectionId = state.sections[newIdx].id;
+    } else {
+      state.view.currentSectionId = null;
+    }
+    persist();
+  }
+
+  /* ================= MUTATIONS: tasks ================= */
+  function flipCaptureTaskRects(){
+    var rects = {};
+    document.querySelectorAll('.task-card').forEach(function(el){
+      rects[el.getAttribute('data-task-id')] = el.getBoundingClientRect();
+    });
+    return rects;
+  }
+  function flipPlay(beforeRects){
+    document.querySelectorAll('.task-card').forEach(function(el){
+      var id = el.getAttribute('data-task-id');
+      var before = beforeRects[id];
+      if(!before){
+        el.classList.add('entering');
+        setTimeout(function(){ el.classList.remove('entering'); }, DUR_BASE);
+        return;
+      }
+      var after = el.getBoundingClientRect();
+      var dx = before.left - after.left;
+      var dy = before.top - after.top;
+      if(Math.abs(dx) < 1 && Math.abs(dy) < 1) return;
+      el.style.transition = 'none';
+      el.style.transform = 'translate(' + dx + 'px,' + dy + 'px)';
+      requestAnimationFrame(function(){
+        el.style.transition = 'transform var(--dur-base) var(--ease-out)';
+        el.style.transform = '';
+        setTimeout(function(){ el.style.transition = ''; }, DUR_BASE + 30);
+      });
+    });
+  }
+  function pulseEl(selector){
+    var el = document.querySelector(selector);
+    if(!el) return;
+    el.classList.remove('pulse');
+    void el.offsetWidth;
+    el.classList.add('pulse');
+    setTimeout(function(){ el.classList.remove('pulse'); }, DUR_BASE + 20);
+  }
+  function autoResizeTextarea(el){
+    if(!el || typeof el.scrollHeight !== 'number') return;
+    var maxH = 260;
+    el.style.height = 'auto';
+    if(el.scrollHeight > maxH){
+      el.style.height = maxH + 'px';
+      el.style.overflowY = 'auto';
+    } else {
+      el.style.height = el.scrollHeight + 'px';
+      el.style.overflowY = 'hidden';
+    }
+  }
+
+  var toastTimer = null;
+  function showToast(message, actionLabel, actionFn, duration){
+    duration = duration || 4000;
+    var root = document.getElementById('toast-root');
+    if(!root) return;
+    clearTimeout(toastTimer);
+    var html = '<div class="toast" id="active-toast"><span class="toast-msg">' + escapeHtml(message) + '</span>';
+    if(actionLabel){ html += '<button type="button" class="toast-action" id="toast-action-btn">' + escapeHtml(actionLabel) + '</button>'; }
+    html += '<button type="button" class="toast-close" id="toast-close-btn" aria-label="Cerrar">' + ICON.x + '</button></div>';
+    root.innerHTML = html;
+    if(actionLabel && actionFn){
+      document.getElementById('toast-action-btn').addEventListener('click', function(){
+        actionFn();
+        dismissToast();
+      });
+    }
+    document.getElementById('toast-close-btn').addEventListener('click', function(){ dismissToast(); });
+    toastTimer = setTimeout(dismissToast, duration);
+  }
+  function dismissToast(){
+    clearTimeout(toastTimer);
+    var el = document.getElementById('active-toast');
+    if(!el) return;
+    el.classList.add('closing');
+    setTimeout(function(){
+      var root = document.getElementById('toast-root');
+      if(root) root.innerHTML = '';
+    }, DUR_FAST);
+  }
+
+  function addTask(listId, title, notes){
+    title = title.trim();
+    if(!title) return;
+    var task = {id:uid('t'), listId:listId, title:title, notes:(notes||'').trim(), dueDate:null, color:null, starred:false, status:'not_started', subtasks:[]};
+    var before = flipCaptureTaskRects();
+    state.tasks.push(task);
+    persist();
+    ui.addingToListId = listId;
+    render();
+    requestAnimationFrame(function(){ flipPlay(before); });
+    var ta = document.querySelector('[data-new-task-input="' + listId + '"]');
+    if(ta) ta.focus();
+  }
+  function deleteTask(taskId){
+    state.tasks = state.tasks.filter(function(t){ return t.id !== taskId; });
+    persist();
+  }
+  function animateAndDeleteTask(taskId, afterFn){
+    var idx = state.tasks.findIndex(function(t){ return t.id === taskId; });
+    if(idx === -1) return;
+    var removedTask = state.tasks[idx];
+    var el = document.querySelector('.task-card[data-task-id="' + taskId + '"]');
+
+    function finish(){
+      var before = flipCaptureTaskRects();
+      deleteTask(taskId);
+      render();
+      requestAnimationFrame(function(){ flipPlay(before); });
+      if(afterFn) afterFn();
+      showToast('Tarea eliminada', 'Deshacer', function(){
+        var before2 = flipCaptureTaskRects();
+        state.tasks.splice(Math.min(idx, state.tasks.length), 0, removedTask);
+        persist();
+        render();
+        requestAnimationFrame(function(){ flipPlay(before2); });
+      }, 5000);
+    }
+    if(!el){ finish(); return; }
+    el.classList.add('leaving');
+    setTimeout(finish, DUR_FAST);
+  }
+  function setTaskStatus(taskId, status){
+    var t = state.tasks.find(function(x){ return x.id === taskId; });
+    if(!t) return;
+    var reachedCompleted = status === 'completed' && t.status !== 'completed';
+    var before = flipCaptureTaskRects();
+    t.status = status;
+    if(status === 'completed'){ ui.expandedCompletedListIds[t.listId] = true; }
+    persist(); render();
+    requestAnimationFrame(function(){
+      flipPlay(before);
+      pulseEl('.status-dot[data-cycle-status="' + taskId + '"]');
+      if(reachedCompleted){
+        var card = document.querySelector('.task-card[data-task-id="' + taskId + '"]');
+        if(card){
+          card.classList.add('completing');
+          setTimeout(function(){ card.classList.remove('completing'); }, DUR_SLOW + 20);
+        }
+      }
+    });
+  }
+  function cycleTaskStatus(taskId){
+    var t = state.tasks.find(function(x){ return x.id === taskId; });
+    if(!t) return;
+    setTaskStatus(taskId, cycleStatus(t.status));
+  }
+  function toggleTaskStarred(taskId){
+    var t = state.tasks.find(function(x){ return x.id === taskId; });
+    if(!t) return;
+    t.starred = !t.starred;
+    var becameStarred = t.starred;
+    persist(); render();
+    if(becameStarred){
+      requestAnimationFrame(function(){ pulseEl('.star-btn[data-toggle-star="' + taskId + '"]'); });
+    }
+  }
+  function toggleSubtaskComplete(taskId, subId){
+    var t = state.tasks.find(function(x){ return x.id === taskId; });
+    if(!t) return;
+    var s = (t.subtasks||[]).find(function(x){ return x.id === subId; });
+    if(!s) return;
+    s.completed = !s.completed;
+    persist(); render();
+  }
+  function moveTaskWithinColumn(taskId, direction){
+    var t = state.tasks.find(function(x){ return x.id === taskId; });
+    if(!t) return;
+    var siblings = state.tasks.filter(function(x){ return x.listId === t.listId; });
+    var idx = siblings.indexOf(t);
+    var swapIdx = direction === 'up' ? idx - 1 : idx + 1;
+    if(swapIdx < 0 || swapIdx >= siblings.length) return;
+    var swapWith = siblings[swapIdx];
+    var globalIdxA = state.tasks.indexOf(t);
+    var globalIdxB = state.tasks.indexOf(swapWith);
+    var before = flipCaptureTaskRects();
+    state.tasks[globalIdxA] = swapWith;
+    state.tasks[globalIdxB] = t;
+    persist();
+    render();
+    requestAnimationFrame(function(){ flipPlay(before); });
+    focusTaskById(taskId);
+  }
+
+  /* ================= Drag and drop ================= */
+  var dragPayload = null;
+
+  var placeholderEl = null;
+  function ensurePlaceholder(listEl, afterEl){
+    if(!placeholderEl){
+      placeholderEl = document.createElement('div');
+      placeholderEl.className = 'drop-placeholder';
+    }
+    if(afterEl){
+      if(placeholderEl.nextSibling !== afterEl || placeholderEl.parentNode !== listEl){
+        listEl.insertBefore(placeholderEl, afterEl);
+      }
+    } else if(placeholderEl.parentNode !== listEl || listEl.lastElementChild !== placeholderEl){
+      listEl.appendChild(placeholderEl);
+    }
+  }
+  function removePlaceholder(){
+    if(placeholderEl && placeholderEl.parentNode){ placeholderEl.parentNode.removeChild(placeholderEl); }
+  }
+
+  function setCustomDragImage(e, card){
+    if(!e.dataTransfer || typeof e.dataTransfer.setDragImage !== 'function') return;
+    try{
+      var rect = card.getBoundingClientRect();
+      var clone = card.cloneNode(true);
+      clone.style.position = 'fixed';
+      clone.style.top = '-9999px';
+      clone.style.left = '-9999px';
+      clone.style.width = rect.width + 'px';
+      clone.style.margin = '0';
+      clone.style.boxShadow = 'var(--shadow-drag)';
+      clone.style.transform = 'rotate(2deg)';
+      clone.style.opacity = '.96';
+      clone.style.pointerEvents = 'none';
+      clone.classList.remove('card-dragging');
+      document.body.appendChild(clone);
+      var offsetX = e.clientX - rect.left;
+      var offsetY = e.clientY - rect.top;
+      e.dataTransfer.setDragImage(clone, offsetX, offsetY);
+      setTimeout(function(){ if(clone.parentNode) clone.parentNode.removeChild(clone); }, 0);
+    }catch(err){ /* custom drag image is a nice-to-have, never block the drag over it */ }
+  }
+
+  function onDragStart(e){
+    var secRow = e.target.closest('[data-sec-drag]');
+    if(secRow){
+      dragPayload = {type:'section', id: secRow.getAttribute('data-sec-drag')};
+      requestAnimationFrame(function(){ secRow.classList.add('row-dragging'); });
+      if(e.dataTransfer) e.dataTransfer.effectAllowed = 'move';
+      return;
+    }
+    var listRow = e.target.closest('[data-list-drag]');
+    if(listRow){
+      dragPayload = {type:'list', id: listRow.getAttribute('data-list-drag')};
+      requestAnimationFrame(function(){ listRow.classList.add('row-dragging'); });
+      if(e.dataTransfer) e.dataTransfer.effectAllowed = 'move';
+      return;
+    }
+    var card = e.target.closest('.task-card');
+    if(card){
+      dragPayload = {type:'task', id: card.getAttribute('data-task-id')};
+      requestAnimationFrame(function(){ card.classList.add('card-dragging'); });
+      if(e.dataTransfer) e.dataTransfer.effectAllowed = 'move';
+      setCustomDragImage(e, card);
+    }
+  }
+
+  function onDragOver(e){
+    if(!dragPayload) return;
+    e.preventDefault();
+    if(dragPayload.type === 'task'){
+      var list = e.target.closest('.task-list');
+      document.querySelectorAll('.task-list.list-drag-over').forEach(function(el){
+        if(el !== list) el.classList.remove('list-drag-over');
+      });
+      if(list){
+        list.classList.add('list-drag-over');
+        var draggingCard = list.querySelector('.card-dragging');
+        var afterEl = getDragAfterElementY(list, e.clientY, '.task-card', draggingCard);
+        ensurePlaceholder(list, afterEl);
+      } else {
+        removePlaceholder();
+      }
+    }
+  }
+
+  function onDrop(e){
+    if(!dragPayload) return;
+    e.preventDefault();
+    removePlaceholder();
+
+    if(dragPayload.type === 'task'){
+      var listEl = e.target.closest('.task-list');
+      if(listEl){
+        var listId = listEl.getAttribute('data-list-tasks');
+        var task = state.tasks.find(function(t){ return t.id === dragPayload.id; });
+        if(task && listId){
+          var afterEl = getDragAfterElementY(listEl, e.clientY, '.task-card', listEl.querySelector('.card-dragging'));
+          var afterId = afterEl ? afterEl.getAttribute('data-task-id') : null;
+          var before = flipCaptureTaskRects();
+          state.tasks = state.tasks.filter(function(t){ return t.id !== task.id; });
+          insertInto(state.tasks, task, 'listId', listId, afterId);
+          persist();
+          dragPayload = null;
+          render();
+          requestAnimationFrame(function(){ flipPlay(before); });
+          return;
+        }
+      }
+    } else if(dragPayload.type === 'list'){
+      var bodyEl = e.target.closest('#section-pager-body');
+      var sec = currentSection();
+      if(bodyEl && sec){
+        var list = state.lists.find(function(l){ return l.id === dragPayload.id; });
+        if(list){
+          var afterElL = getDragAfterElementY(bodyEl, e.clientY, '.list-row', bodyEl.querySelector('.row-dragging'));
+          var afterIdL = afterElL ? afterElL.getAttribute('data-list-id') : null;
+          state.lists = state.lists.filter(function(l){ return l.id !== list.id; });
+          insertInto(state.lists, list, 'sectionId', sec.id, afterIdL);
+          persist();
+        }
+      }
+    } else if(dragPayload.type === 'section'){
+      var dd = document.getElementById('all-sections-dropdown');
+      var sec2 = state.sections.find(function(s){ return s.id === dragPayload.id; });
+      if(sec2 && dd){
+        var afterElS = getDragAfterElementY(dd, e.clientY, '.section-menu-item-row', dd.querySelector('.row-dragging'));
+        var afterIdS = afterElS ? afterElS.getAttribute('data-sec-id') : null;
+        state.sections = state.sections.filter(function(s){ return s.id !== sec2.id; });
+        if(afterIdS){
+          var idx = state.sections.findIndex(function(s){ return s.id === afterIdS; });
+          state.sections.splice(idx, 0, sec2);
+        } else {
+          state.sections.push(sec2);
+        }
+        persist();
+      }
+    }
+
+    dragPayload = null;
+    render();
+  }
+
+  function onDragEnd(){
+    dragPayload = null;
+    removePlaceholder();
+    document.querySelectorAll('.card-dragging').forEach(function(el){ el.classList.remove('card-dragging'); });
+    document.querySelectorAll('.row-dragging').forEach(function(el){ el.classList.remove('row-dragging'); });
+    document.querySelectorAll('.list-drag-over').forEach(function(el){ el.classList.remove('list-drag-over'); });
+  }
+
+  /* ================= Task modal ================= */
+  function closeOverlayAnimated(overlayId, cleanupFn){
+    var el = document.getElementById(overlayId);
+    if(!el){ cleanupFn(); render(); return; }
+    el.classList.add('closing');
+    setTimeout(function(){
+      cleanupFn();
+      render();
+    }, DUR_FAST);
+  }
+
+  function openTaskModal(taskId){
+    var t = state.tasks.find(function(x){ return x.id === taskId; });
+    if(!t) return;
+    ui.editingTaskId = taskId;
+    ui.editingTaskDraft = JSON.parse(JSON.stringify(t));
+    ui.confirmDeleteTask = false;
+    ui.settingsOpen = false;
+    render();
+  }
+  function closeModal(){
+    closeOverlayAnimated('modal-overlay', function(){
+      ui.editingTaskId = null;
+      ui.editingTaskDraft = null;
+      ui.confirmDeleteTask = false;
+      ui.notesFullscreenOpen = false;
+      ui.notesFullscreenTab = 'edit';
+    });
+  }
+  function closeSettings(){
+    closeOverlayAnimated('settings-overlay', function(){
+      ui.settingsOpen = false;
+      ui.confirmResetData = false;
+      ui.pendingImportData = null;
+      ui.importError = null;
+    });
+  }
+  function saveModal(){
+    var draft = ui.editingTaskDraft;
+    var titleInp = document.getElementById('modal-title');
+    var dateInp = document.getElementById('modal-date');
+    draft.title = titleInp.value.trim() || 'Sin título';
+    draft.dueDate = dateInp.value || null;
+    // draft.notes is kept live-synced by the modal-notes and notes-fullscreen-textarea input handlers,
+    // so it already reflects whichever editor the person last typed in — reading a specific field
+    // here could grab a stale value if they were using the other one.
+
+    document.querySelectorAll('[data-subtask-draft-title]').forEach(function(inp){
+      var sid = inp.getAttribute('data-subtask-draft-title');
+      var s = draft.subtasks.find(function(x){ return x.id === sid; });
+      if(s) s.title = inp.value.trim() || 'Sin título';
+    });
+    document.querySelectorAll('[data-subtask-draft-notes]').forEach(function(inp){
+      var sid = inp.getAttribute('data-subtask-draft-notes');
+      var s = draft.subtasks.find(function(x){ return x.id === sid; });
+      if(s) s.notes = inp.value;
+    });
+
+    var task = state.tasks.find(function(t){ return t.id === draft.id; });
+    if(task){
+      task.title = draft.title;
+      task.notes = draft.notes;
+      task.dueDate = draft.dueDate;
+      task.color = draft.color;
+      task.starred = draft.starred;
+      task.status = draft.status;
+      task.subtasks = draft.subtasks;
+      if(task.status === 'completed'){ ui.expandedCompletedListIds[task.listId] = true; }
+      persist();
+    }
+    closeModal();
+  }
+
+  function renderTaskModal(){
+    var t = ui.editingTaskDraft;
+    var html = '<div class="overlay" id="modal-overlay"><div class="modal" id="modal-box">';
+    html += '<div class="modal-header"><h2>Editar tarea</h2><button class="icon-btn" id="modal-close">' + ICON.x + '</button></div>';
+
+    html += '<div class="field-group"><span class="field-label">Estado</span><div class="status-options">';
+    STATUS_ORDER.forEach(function(key){
+      html += '<button class="status-option' + (t.status===key ? ' active' : '') + '" data-status-option="' + key + '">';
+      html += '<span class="status-option-dot">';
+      if(key === 'in_progress'){ html += '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/></svg>'; }
+      else if(key === 'completed'){ html += '<svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>'; }
+      html += '</span>' + STATUS_LABELS[key] + '</button>';
+    });
+    html += '</div></div>';
+    html += '<div class="toggle-row" id="modal-star-toggle"><button class="star-btn' + (t.starred ? ' starred' : '') + '" id="modal-star-btn">' + (t.starred ? ICON.starFilled : ICON.star) + '</button><span>Destacada</span></div>';
+
+    html += '<div class="field-group"><span class="field-label">Título</span><input class="field-input" id="modal-title" value="' + escapeHtml(t.title) + '" maxlength="120"></div>';
+    html += '<div class="field-group"><div class="field-label-row"><span class="field-label">Notas</span><button type="button" class="field-label-action" id="notes-expand-btn" title="Ver en pantalla completa">' + ICON.expand + ' Pantalla completa</button></div><textarea class="field-textarea auto-resize" id="modal-notes" rows="1">' + escapeHtml(t.notes||'') + '</textarea></div>';
+    html += '<div class="field-group"><span class="field-label">Fecha límite</span><input class="field-input" type="date" id="modal-date" value="' + (t.dueDate||'') + '"></div>';
+
+    html += '<div class="field-group"><span class="field-label">Etiqueta</span><div class="swatch-row">';
+    html += '<button type="button" class="swatch none' + (!t.color ? ' selected' : '') + '" data-swatch="" title="Sin etiqueta">' + ICON.check + '</button>';
+    Object.keys(COLORS).forEach(function(key){
+      html += '<button type="button" class="swatch' + (t.color===key ? ' selected' : '') + '" data-swatch="' + key + '" style="background:' + COLORS[key] + '" title="' + key + '">' + ICON.check + '</button>';
+    });
+    html += '</div></div>';
+
+    html += '<div class="field-group"><span class="field-label">Subtareas</span>';
+    (t.subtasks||[]).forEach(function(s){
+      html += '<div class="subtask-edit-row">';
+      html += '<div class="subtask-edit-top"><button class="checkbox' + (s.completed ? ' checked' : '') + '" data-toggle-draft-subtask="' + s.id + '">' + ICON.check + '</button>';
+      html += '<input class="field-input" data-subtask-draft-title="' + s.id + '" value="' + escapeHtml(s.title) + '" maxlength="120">';
+      html += '<button class="icon-btn subtask-remove" data-remove-draft-subtask="' + s.id + '">' + ICON.x + '</button></div>';
+      html += '<div class="subtask-edit-notes"><textarea class="field-textarea" data-subtask-draft-notes="' + s.id + '" placeholder="Nota (opcional)">' + escapeHtml(s.notes||'') + '</textarea></div>';
+      html += '</div>';
+    });
+    html += '<button class="add-subtask-btn" id="add-subtask-btn">' + ICON.plus + ' Añadir subtarea</button>';
+    html += '</div>';
+
+    html += '<div class="modal-footer"><button class="btn-danger-text" id="modal-delete">' + (ui.confirmDeleteTask ? '¿Eliminar? Confirmar' : 'Eliminar tarea') + '</button>';
+    html += '<div class="footer-right"><button class="btn-secondary-text" id="modal-cancel">Cancelar</button><button class="btn-modal-primary" id="modal-save">Guardar cambios</button></div></div>';
+
+    html += '</div></div>';
+    return html;
+  }
+
+  /* ================= Settings modal ================= */
+  function kbd(label){ return '<kbd class="key">' + escapeHtml(label) + '</kbd>'; }
+  function shortcutRow(desc, keysHtml){ return '<div class="shortcut-row"><span class="shortcut-desc">' + desc + '</span><div class="shortcut-keys">' + keysHtml + '</div></div>'; }
+
+  function sanitizeView(view, lists, sections){
+    view = (view && typeof view === 'object') ? view : {};
+    var mode = (view.mode === 'all' || view.mode === 'starred' || view.mode === 'lists') ? view.mode : 'lists';
+    var selectedListIds = Array.isArray(view.selectedListIds) ? view.selectedListIds.filter(function(id){
+      return lists.some(function(l){ return l.id === id; });
+    }) : [];
+    var currentSectionId = (view.currentSectionId && sections.some(function(s){ return s.id === view.currentSectionId; }))
+      ? view.currentSectionId
+      : (sections[0] ? sections[0].id : null);
+    return { mode:mode, selectedListIds:selectedListIds, sidebarCollapsed:!!view.sidebarCollapsed, currentSectionId:currentSectionId };
+  }
+
+  function validateImportedData(parsed){
+    var data = (parsed && parsed.data && Array.isArray(parsed.data.sections)) ? parsed.data : parsed;
+    if(!data || !Array.isArray(data.sections) || !Array.isArray(data.lists) || !Array.isArray(data.tasks)) return null;
+
+    var sections = data.sections.filter(function(s){ return s && typeof s.id === 'string' && typeof s.title === 'string'; });
+    var lists = data.lists.filter(function(l){ return l && typeof l.id === 'string' && typeof l.sectionId === 'string' && typeof l.title === 'string'; });
+    var tasks = data.tasks.filter(function(t){ return t && typeof t.id === 'string' && typeof t.listId === 'string' && typeof t.title === 'string'; });
+
+    migrateTasksStatus(tasks);
+    tasks.forEach(function(t){
+      if(!Array.isArray(t.subtasks)) t.subtasks = [];
+      t.subtasks = t.subtasks.filter(function(s){ return s && typeof s.id === 'string' && typeof s.title === 'string'; });
+      if(typeof t.notes !== 'string') t.notes = '';
+      if(typeof t.starred !== 'boolean') t.starred = false;
+      if(typeof t.dueDate === 'undefined') t.dueDate = null;
+      if(typeof t.color === 'undefined') t.color = null;
+    });
+
+    var theme = (data.theme === 'light' || data.theme === 'dark' || data.theme === 'auto') ? data.theme : 'dark';
+    return { theme:theme, sections:sections, lists:lists, tasks:tasks, view: sanitizeView(data.view, lists, sections) };
+  }
+
+  function exportData(){
+    var payload = {
+      app:'taskboard', version:1, exportedAt:new Date().toISOString(),
+      data:{ theme:state.theme, view:state.view, sections:state.sections, lists:state.lists, tasks:state.tasks }
+    };
+    var json = JSON.stringify(payload, null, 2);
+    try{
+      var blob = new Blob([json], {type:'application/json'});
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url;
+      a.download = 'taskboard-backup-' + todayISO() + '.json';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
+      ui.exportFeedback = 'ok';
+    }catch(err){
+      console.error('No se pudo exportar', err);
+      ui.exportFeedback = 'error';
+    }
+    render();
+    setTimeout(function(){ ui.exportFeedback = null; render(); }, 2500);
+  }
+
+  function handleImportFile(file){
+    var reader = new FileReader();
+    reader.onload = function(){
+      try{
+        var parsed = JSON.parse(String(reader.result));
+        var validated = validateImportedData(parsed);
+        if(!validated){
+          ui.importError = 'El archivo no tiene un formato válido de backup de Taskboard.';
+          ui.pendingImportData = null;
+        } else {
+          ui.importError = null;
+          ui.pendingImportData = validated;
+        }
+      }catch(err){
+        ui.importError = 'No se pudo leer el archivo. ¿Es un JSON válido?';
+        ui.pendingImportData = null;
+      }
+      render();
+    };
+    reader.onerror = function(){
+      ui.importError = 'No se pudo leer el archivo.';
+      ui.pendingImportData = null;
+      render();
+    };
+    reader.readAsText(file);
+  }
+
+  function applyImportedData(){
+    var d = ui.pendingImportData;
+    if(!d) return;
+    state.theme = d.theme;
+    state.sections = d.sections;
+    state.lists = d.lists;
+    state.tasks = d.tasks;
+    state.view = d.view;
+    ui.pendingImportData = null;
+    ui.importError = null;
+    applyTheme();
+    persist();
+    render();
+  }
+
+  function cancelImport(){
+    ui.pendingImportData = null;
+    ui.importError = null;
+    render();
+  }
+
+  function renderSettingsModal(){
+    var html = '<div class="overlay" id="settings-overlay"><div class="modal" id="settings-box" style="width:440px;">';
+    html += '<div class="modal-header"><h2>Configuración</h2><button class="icon-btn" id="settings-close">' + ICON.x + '</button></div>';
+
+    html += '<div class="settings-section"><div class="settings-section-title">Apariencia</div><div class="theme-options">';
+    [['light','Claro',ICON.sun],['dark','Oscuro',ICON.moon],['auto','Automático',ICON.auto]].forEach(function(opt){
+      html += '<button type="button" class="theme-option' + (state.theme===opt[0] ? ' active' : '') + '" data-set-theme="' + opt[0] + '">' + opt[2] + '<span>' + opt[1] + '</span></button>';
+    });
+    html += '</div></div>';
+
+    html += '<div class="settings-section" id="settings-shortcuts-section"><div class="settings-section-title">Atajos de teclado</div>';
+
+    html += '<div class="shortcuts-group-title">Navegación</div>';
+    html += shortcutRow('Moverte entre tareas de una lista', kbd('↑') + kbd('↓'));
+    html += shortcutRow('Moverte entre listas (columnas)', kbd('←') + kbd('→'));
+    html += shortcutRow('Buscar', kbd('/'));
+    html += shortcutRow('Sección anterior / siguiente', kbd('[') + kbd(']'));
+    html += shortcutRow('Mostrar u ocultar el menú lateral', kbd('M'));
+    html += shortcutRow('Ver todas las tareas', kbd('A'));
+    html += shortcutRow('Ver destacadas', kbd('F'));
+
+    html += '<div class="shortcuts-group-title">Con una tarea seleccionada</div>';
+    html += shortcutRow('Abrir la tarea', kbd('Enter') + kbd('E'));
+    html += shortcutRow('Cambiar de estado (Sin empezar → En progreso → Completada)', kbd('Espacio'));
+    html += shortcutRow('Poner un estado directo', kbd('1') + kbd('2') + kbd('3'));
+    html += shortcutRow('Marcar o desmarcar como destacada', kbd('F'));
+    html += shortcutRow('Mover la tarea arriba o abajo en la lista', kbd('Ctrl') + '<span class="plus">+</span>' + kbd('Shift') + '<span class="plus">+</span>' + kbd('↑') + kbd('↓'));
+    html += shortcutRow('Eliminar (tocar 2 veces para confirmar)', kbd('Supr'));
+    html += shortcutRow('Deseleccionar la tarea', kbd('Esc'));
+
+    html += '<div class="shortcuts-group-title">General</div>';
+    html += shortcutRow('Crear una tarea nueva', kbd('N'));
+    html += shortcutRow('Guardar cambios en el editor de tareas', kbd('Ctrl') + '<span class="plus">+</span>' + kbd('Enter'));
+    html += shortcutRow('Cerrar cualquier ventana o menú', kbd('Esc'));
+    html += shortcutRow('Mostrar esta ayuda', kbd('?'));
+
+    html += '</div>';
+
+    html += '<div class="settings-section"><div class="settings-section-title">Datos</div>';
+    html += '<div class="data-actions-row">';
+    html += '<button type="button" class="secondary-btn" id="export-data-btn">' + (ui.exportFeedback === 'ok' ? 'Descargado ✓' : ui.exportFeedback === 'error' ? 'No se pudo exportar' : 'Exportar datos') + '</button>';
+    html += '<button type="button" class="secondary-btn" id="import-data-btn">Importar datos</button>';
+    html += '</div>';
+    html += '<input type="file" id="import-file-input" accept="application/json,.json" style="display:none;">';
+    if(ui.importError){
+      html += '<div class="import-preview error">' + escapeHtml(ui.importError) + '</div>';
+    } else if(ui.pendingImportData){
+      var imp = ui.pendingImportData;
+      html += '<div class="import-preview">Se encontraron <strong>' + imp.sections.length + '</strong> secciones, <strong>' + imp.lists.length + '</strong> listas y <strong>' + imp.tasks.length + '</strong> tareas en el archivo.<br>Esto va a reemplazar todos tus datos actuales.';
+      html += '<div class="import-preview-actions">';
+      html += '<button type="button" class="btn-secondary-text" id="import-cancel-btn">Cancelar</button>';
+      html += '<button type="button" class="danger-btn" id="import-confirm-btn">Reemplazar datos</button>';
+      html += '</div></div>';
+    }
+    html += '<button class="danger-btn" id="reset-data-btn">' + (ui.confirmResetData ? '¿Seguro? Tocá de nuevo para borrar todo' : 'Borrar todos los datos') + '</button>';
+    html += '</div>';
+
+    html += '</div></div>';
+    return html;
+  }
+
+  function renderOverlay(){
+    if(ui.editingTaskId && ui.editingTaskDraft){
+      var html = renderTaskModal();
+      if(ui.notesFullscreenOpen){ html += renderNotesFullscreen(); }
+      overlayRoot.innerHTML = html;
+      wireTaskModal();
+      if(ui.notesFullscreenOpen){ wireNotesFullscreen(); }
+    } else if(ui.settingsOpen){
+      overlayRoot.innerHTML = renderSettingsModal();
+      wireSettingsModal();
+    } else {
+      overlayRoot.innerHTML = '';
+    }
+  }
+
+  function renderNotesFullscreen(){
+    var notes = ui.editingTaskDraft.notes || '';
+    var html = '<div class="overlay" id="notes-fullscreen-overlay" style="z-index:150;">';
+    html += '<div class="modal notes-fullscreen-modal">';
+    html += '<div class="modal-header"><h2>Notas</h2><button class="icon-btn" id="notes-fullscreen-close">' + ICON.x + '</button></div>';
+    html += '<div class="notes-fs-tabs">';
+    html += '<button type="button" class="notes-fs-tab' + (ui.notesFullscreenTab === 'edit' ? ' active' : '') + '" data-notes-tab="edit">Editar</button>';
+    html += '<button type="button" class="notes-fs-tab' + (ui.notesFullscreenTab === 'preview' ? ' active' : '') + '" data-notes-tab="preview">Vista previa</button>';
+    html += '</div>';
+    html += '<div class="notes-fs-body">';
+    if(ui.notesFullscreenTab === 'edit'){
+      html += '<textarea class="notes-fs-textarea" id="notes-fullscreen-textarea" placeholder="Escribí tus notas acá. Podés usar Markdown: # títulos, - viñetas, **negrita**, [link](url)...">' + escapeHtml(notes) + '</textarea>';
+    } else {
+      if(notes.trim()){
+        html += '<div class="notes-fs-preview md-content">' + renderMarkdown(notes) + '</div>';
+      } else {
+        html += '<div class="notes-fs-preview">' + renderEmptyState(ICON.emptyInbox, 'Sin notas', 'Escribí algo en la pestaña Editar para verlo acá formateado.') + '</div>';
+      }
+    }
+    html += '</div></div></div>';
+    return html;
+  }
+
+  function wireNotesFullscreen(){
+    document.getElementById('notes-fullscreen-overlay').addEventListener('mousedown', function(e){
+      if(e.target.id === 'notes-fullscreen-overlay') closeNotesFullscreen();
+    });
+    document.getElementById('notes-fullscreen-close').addEventListener('click', closeNotesFullscreen);
+    document.querySelectorAll('[data-notes-tab]').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        ui.notesFullscreenTab = btn.getAttribute('data-notes-tab');
+        render();
+      });
+    });
+    var ta = document.getElementById('notes-fullscreen-textarea');
+    if(ta){
+      ta.focus();
+      ta.setSelectionRange(ta.value.length, ta.value.length);
+      ta.addEventListener('input', function(){ ui.editingTaskDraft.notes = ta.value; });
+    }
+  }
+  function closeNotesFullscreen(){
+    closeOverlayAnimated('notes-fullscreen-overlay', function(){
+      ui.notesFullscreenOpen = false;
+    });
+  }
+
+  function wireTaskModal(){
+    document.getElementById('modal-overlay').addEventListener('mousedown', function(e){
+      if(e.target.id === 'modal-overlay') closeModal();
+    });
+    document.getElementById('modal-close').addEventListener('click', closeModal);
+    document.getElementById('modal-cancel').addEventListener('click', closeModal);
+    document.getElementById('modal-save').addEventListener('click', saveModal);
+    var notesEl = document.getElementById('modal-notes');
+    if(notesEl){
+      autoResizeTextarea(notesEl);
+      notesEl.addEventListener('input', function(){
+        autoResizeTextarea(notesEl);
+        ui.editingTaskDraft.notes = notesEl.value;
+      });
+    }
+    var notesExpandBtn = document.getElementById('notes-expand-btn');
+    if(notesExpandBtn){
+      notesExpandBtn.addEventListener('click', function(){
+        if(notesEl) ui.editingTaskDraft.notes = notesEl.value;
+        ui.notesFullscreenOpen = true;
+        ui.notesFullscreenTab = 'edit';
+        render();
+      });
+    }
+    document.querySelectorAll('[data-status-option]').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        ui.editingTaskDraft.status = btn.getAttribute('data-status-option');
+        render();
+      });
+    });
+    document.getElementById('modal-star-toggle').addEventListener('click', function(){
+      ui.editingTaskDraft.starred = !ui.editingTaskDraft.starred;
+      render();
+    });
+    document.getElementById('modal-delete').addEventListener('click', function(){
+      if(ui.confirmDeleteTask){
+        var idToDelete = ui.editingTaskDraft.id;
+        closeModal();
+        animateAndDeleteTask(idToDelete);
+      }
+      else { ui.confirmDeleteTask = true; render(); }
+    });
+    document.querySelectorAll('[data-swatch]').forEach(function(sw){
+      sw.addEventListener('click', function(){ ui.editingTaskDraft.color = sw.getAttribute('data-swatch') || null; render(); });
+    });
+    document.querySelectorAll('[data-toggle-draft-subtask]').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        var sid = btn.getAttribute('data-toggle-draft-subtask');
+        var s = ui.editingTaskDraft.subtasks.find(function(x){ return x.id === sid; });
+        if(s){ s.completed = !s.completed; render(); }
+      });
+    });
+    document.querySelectorAll('[data-remove-draft-subtask]').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        var sid = btn.getAttribute('data-remove-draft-subtask');
+        ui.editingTaskDraft.subtasks = ui.editingTaskDraft.subtasks.filter(function(x){ return x.id !== sid; });
+        render();
+      });
+    });
+    document.getElementById('add-subtask-btn').addEventListener('click', function(){
+      ui.editingTaskDraft.subtasks.push({id:uid('st'), title:'', notes:'', completed:false});
+      render();
+      var inputs = document.querySelectorAll('[data-subtask-draft-title]');
+      if(inputs.length){ inputs[inputs.length-1].focus(); }
+    });
+    document.getElementById('modal-title').addEventListener('keydown', function(e){
+      if(e.key === 'Enter'){ e.preventDefault(); saveModal(); }
+    });
+  }
+
+  function wireSettingsModal(){
+    document.getElementById('settings-overlay').addEventListener('mousedown', function(e){
+      if(e.target.id === 'settings-overlay'){ closeSettings(); }
+    });
+    document.getElementById('settings-close').addEventListener('click', closeSettings);
+    document.querySelectorAll('[data-set-theme]').forEach(function(el){
+      el.addEventListener('click', function(){
+        state.theme = el.getAttribute('data-set-theme');
+        applyTheme(); persist(); render();
+      });
+    });
+    document.getElementById('export-data-btn').addEventListener('click', exportData);
+    document.getElementById('import-data-btn').addEventListener('click', function(){
+      document.getElementById('import-file-input').click();
+    });
+    document.getElementById('import-file-input').addEventListener('change', function(e){
+      var file = e.target.files && e.target.files[0];
+      if(file) handleImportFile(file);
+      e.target.value = '';
+    });
+    var importCancelBtn = document.getElementById('import-cancel-btn');
+    if(importCancelBtn) importCancelBtn.addEventListener('click', cancelImport);
+    var importConfirmBtn = document.getElementById('import-confirm-btn');
+    if(importConfirmBtn) importConfirmBtn.addEventListener('click', applyImportedData);
+    document.getElementById('reset-data-btn').addEventListener('click', function(){
+      if(ui.confirmResetData){
+        var secId = uid('sec'); var listId = uid('list');
+        state.sections = [{id:secId, title:'Listas'}];
+        state.lists = [{id:listId, sectionId:secId, title:'Tareas'}];
+        state.tasks = [];
+        state.view = {mode:'lists', selectedListIds:[listId], sidebarCollapsed:false, currentSectionId:secId};
+        ui.confirmResetData = false;
+        persist(); render();
+      } else {
+        ui.confirmResetData = true; render();
+      }
+    });
+  }
+
+  /* ================= Click / input delegation ================= */
+  function onSidebarClick(e){
+    var el;
+    if((el = e.target.closest('#create-btn'))){
+      ui.createMenuOpen = !ui.createMenuOpen; render(); return;
+    }
+    if((el = e.target.closest('#create-task-opt'))){
+      ui.createMenuOpen = false;
+      quickAddTask();
+      return;
+    }
+    if((el = e.target.closest('#create-section-opt'))){
+      ui.createMenuOpen = false; ui.addingSection = true; render(); return;
+    }
+    if((el = e.target.closest('#nav-all'))){ state.view.mode = 'all'; persist(); render(); return; }
+    if((el = e.target.closest('#nav-starred'))){ state.view.mode = 'starred'; persist(); render(); return; }
+
+    if((el = e.target.closest('#sec-prev-btn'))){
+      var pIdx = getSectionIndex(state.view.currentSectionId);
+      if(pIdx > 0) goToSection(state.sections[pIdx - 1].id, 'prev');
+      return;
+    }
+    if((el = e.target.closest('#sec-next-btn'))){
+      var nIdx = getSectionIndex(state.view.currentSectionId);
+      if(nIdx > -1 && nIdx < state.sections.length - 1) goToSection(state.sections[nIdx + 1].id, 'next');
+      return;
+    }
+    if((el = e.target.closest('[data-jump-section]'))){
+      goToSection(el.getAttribute('data-jump-section'));
+      return;
+    }
+    if((el = e.target.closest('#dropdown-add-section-opt'))){
+      ui.allSectionsMenuOpen = false; ui.addingSection = true; render(); return;
+    }
+    if((el = e.target.closest('#pager-title-btn'))){
+      ui.allSectionsMenuOpen = !ui.allSectionsMenuOpen; render(); return;
+    }
+    if((el = e.target.closest('#current-section-menu-toggle'))){
+      ui.currentSectionMenuOpen = !ui.currentSectionMenuOpen;
+      ui.confirmDeleteCurrentSection = false; render(); return;
+    }
+    if((el = e.target.closest('#current-section-rename-trigger'))){
+      ui.editingCurrentSectionTitle = true; ui.currentSectionMenuOpen = false; render(); return;
+    }
+    if((el = e.target.closest('#current-section-confirm-delete'))){
+      deleteCurrentSectionAction();
+      ui.currentSectionMenuOpen = false; ui.confirmDeleteCurrentSection = false; render(); return;
+    }
+    if((el = e.target.closest('#current-section-delete-trigger'))){
+      ui.confirmDeleteCurrentSection = true; render(); return;
+    }
+
+    if((el = e.target.closest('[data-add-list-to]'))){
+      ui.addingListToSectionId = el.getAttribute('data-add-list-to');
+      render(); return;
+    }
+    if((el = e.target.closest('[data-toggle-list]'))){
+      toggleListSelected(el.getAttribute('data-toggle-list')); render(); return;
+    }
+    if((el = e.target.closest('[data-select-list]'))){
+      toggleListSelected(el.getAttribute('data-select-list')); render(); return;
+    }
+    if((el = e.target.closest('[data-toggle-list-menu]'))){
+      var lid = el.getAttribute('data-toggle-list-menu');
+      ui.openListMenuId = (ui.openListMenuId === lid) ? null : lid;
+      ui.confirmDeleteListId = null; ui.movingListId = null; render(); return;
+    }
+    if((el = e.target.closest('[data-move-list-trigger]'))){
+      ui.movingListId = el.getAttribute('data-move-list-trigger'); render(); return;
+    }
+    if((el = e.target.closest('[data-move-list-back]'))){
+      ui.movingListId = null; render(); return;
+    }
+    if((el = e.target.closest('[data-move-list-to]'))){
+      var moveParts = el.getAttribute('data-move-list-to').split('|');
+      moveListToSection(moveParts[0], moveParts[1]);
+      ui.movingListId = null; ui.openListMenuId = null; render(); return;
+    }
+    if((el = e.target.closest('[data-rename-list-trigger]'))){
+      ui.editingListTitleId = el.getAttribute('data-rename-list-trigger');
+      ui.openListMenuId = null; render();
+      focusInline('[data-rename-list="' + ui.editingListTitleId + '"]'); return;
+    }
+    if((el = e.target.closest('[data-confirm-delete-list]'))){
+      deleteList(el.getAttribute('data-confirm-delete-list'));
+      ui.openListMenuId = null; ui.confirmDeleteListId = null; render(); return;
+    }
+    if((el = e.target.closest('[data-delete-list]'))){
+      ui.confirmDeleteListId = el.getAttribute('data-delete-list'); render(); return;
+    }
+    if((el = e.target.closest('#settings-btn'))){
+      ui.settingsOpen = true; render(); return;
+    }
+    if((el = e.target.closest('#add-section-row'))){
+      ui.addingSection = true; render(); return;
+    }
+  }
+
+  function focusInline(selector){
+    var el = document.querySelector(selector);
+    if(el){ el.focus(); el.select(); }
+  }
+
+  function wireSidebarInputs(){
+    var nl = document.getElementById('new-list-input');
+    if(nl){
+      nl.addEventListener('keydown', function(e){
+        if(e.key === 'Enter'){ e.preventDefault(); addList(ui.addingListToSectionId, nl.value); ui.addingListToSectionId=null; render(); }
+        else if(e.key === 'Escape'){ ui.addingListToSectionId=null; render(); }
+      });
+      nl.addEventListener('blur', function(){
+        if(nl.value.trim()) addList(ui.addingListToSectionId, nl.value);
+        ui.addingListToSectionId=null; render();
+      });
+    }
+    var ns = document.getElementById('new-section-input');
+    if(ns){
+      ns.addEventListener('keydown', function(e){
+        if(e.key === 'Enter'){ e.preventDefault(); addSection(ns.value); ui.addingSection=false; render(); }
+        else if(e.key === 'Escape'){ ui.addingSection=false; render(); }
+      });
+      ns.addEventListener('blur', function(){
+        if(ns.value.trim()) addSection(ns.value);
+        ui.addingSection=false; render();
+      });
+    }
+    var cst = document.getElementById('current-section-title-input');
+    if(cst){
+      cst.addEventListener('keydown', function(e){
+        if(e.key === 'Enter'){ e.preventDefault(); cst.blur(); }
+        else if(e.key === 'Escape'){ ui.editingCurrentSectionTitle = false; render(); }
+      });
+      cst.addEventListener('blur', function(){
+        var sec = currentSection();
+        if(sec) renameSection(sec.id, cst.value);
+        ui.editingCurrentSectionTitle = false; render();
+      });
+    }
+    document.querySelectorAll('[data-rename-list]').forEach(function(inp){
+      inp.addEventListener('keydown', function(e){
+        if(e.key === 'Enter'){ e.preventDefault(); inp.blur(); }
+        else if(e.key === 'Escape'){ ui.editingListTitleId = null; render(); }
+      });
+      inp.addEventListener('blur', function(){
+        renameList(inp.getAttribute('data-rename-list'), inp.value);
+        ui.editingListTitleId = null; render();
+      });
+    });
+  }
+
+  function quickAddTask(){
+    if(state.lists.length === 0) return;
+    var targetListId;
+    if(state.view.mode === 'lists' && state.view.selectedListIds.length > 0){
+      targetListId = state.view.selectedListIds[0];
+    } else {
+      targetListId = state.lists[0].id;
+      state.view.mode = 'lists';
+      if(state.view.selectedListIds.indexOf(targetListId) === -1) state.view.selectedListIds.push(targetListId);
+      persist();
+    }
+    ui.addingToListId = targetListId;
+    render();
+    var ta = document.querySelector('[data-new-task-input="' + targetListId + '"]');
+    if(ta){ if(ta.scrollIntoView) ta.scrollIntoView({block:'nearest'}); ta.focus(); }
+  }
+
+  function onBoardClick(e){
+    var el;
+    if((el = e.target.closest('[data-cycle-status]'))){ cycleTaskStatus(el.getAttribute('data-cycle-status')); return; }
+    if((el = e.target.closest('[data-toggle-star]'))){ toggleTaskStarred(el.getAttribute('data-toggle-star')); return; }
+    if((el = e.target.closest('[data-toggle-subtask]'))){
+      var parts = el.getAttribute('data-toggle-subtask').split('|');
+      toggleSubtaskComplete(parts[0], parts[1]); return;
+    }
+    if((el = e.target.closest('[data-open-task]'))){ openTaskModal(el.getAttribute('data-open-task')); return; }
+    if((el = e.target.closest('[data-add-task]'))){
+      ui.addingToListId = el.getAttribute('data-add-task'); render();
+      var ta = document.querySelector('[data-new-task-input="' + ui.addingToListId + '"]');
+      if(ta) ta.focus();
+      return;
+    }
+    if((el = e.target.closest('[data-cancel-task]'))){ ui.addingToListId = null; render(); return; }
+    if((el = e.target.closest('[data-submit-task]'))){
+      var lid2 = el.getAttribute('data-submit-task');
+      var taInp = document.querySelector('[data-new-task-input="' + lid2 + '"]');
+      var notesInp = document.querySelector('[data-new-task-notes="' + lid2 + '"]');
+      addTask(lid2, taInp ? taInp.value : '', notesInp ? notesInp.value : '');
+      return;
+    }
+    if((el = e.target.closest('[data-toggle-completed]'))){
+      var lid3 = el.getAttribute('data-toggle-completed');
+      ui.expandedCompletedListIds[lid3] = !ui.expandedCompletedListIds[lid3];
+      render(); return;
+    }
+    if((el = e.target.closest('[data-remove-from-view]'))){
+      var lid4 = el.getAttribute('data-remove-from-view');
+      state.view.selectedListIds = state.view.selectedListIds.filter(function(x){ return x !== lid4; });
+      persist(); render(); return;
+    }
+  }
+
+  function wireBoardInputs(){
+    document.querySelectorAll('[data-new-task-input]').forEach(function(ta){
+      ta.addEventListener('keydown', function(e){
+        var listId = ta.getAttribute('data-new-task-input');
+        if(e.key === 'Enter' && !e.shiftKey){
+          e.preventDefault();
+          var notesEl = document.querySelector('[data-new-task-notes="' + listId + '"]');
+          addTask(listId, ta.value, notesEl ? notesEl.value : '');
+        }
+        else if(e.key === 'Escape'){ ui.addingToListId = null; render(); }
+      });
+    });
+    document.querySelectorAll('[data-new-task-notes]').forEach(function(ta){
+      autoResizeTextarea(ta);
+      ta.addEventListener('input', function(){ autoResizeTextarea(ta); });
+      ta.addEventListener('keydown', function(e){
+        var listId = ta.getAttribute('data-new-task-notes');
+        if(e.key === 'Enter' && (e.metaKey || e.ctrlKey)){
+          e.preventDefault();
+          var titleEl = document.querySelector('[data-new-task-input="' + listId + '"]');
+          addTask(listId, titleEl ? titleEl.value : '', ta.value);
+        }
+        else if(e.key === 'Escape'){ ui.addingToListId = null; render(); }
+      });
+    });
+  }
+
+  /* ================= Keyboard-first navigation ================= */
+  function isFormField(el){
+    if(!el) return false;
+    var tag = el.tagName;
+    return tag === 'INPUT' || tag === 'TEXTAREA' || !!el.isContentEditable;
+  }
+  function focusTaskById(id){
+    var el = document.querySelector('.task-card[data-task-id="' + id + '"]');
+    if(el) el.focus();
+    return el;
+  }
+  function getVisibleColumnEls(){
+    return Array.prototype.slice.call(boardEl.querySelectorAll('.column'));
+  }
+  function getTaskCardEls(colEl){
+    return Array.prototype.slice.call(colEl.querySelectorAll('.task-card'));
+  }
+  function focusColumnFallback(colEl){
+    if(!colEl) return;
+    var addBtn = colEl.querySelector('.add-task-btn');
+    if(addBtn){ addBtn.focus(); return; }
+    var ta = colEl.querySelector('[data-new-task-input]');
+    if(ta){ ta.focus(); }
+  }
+
+  function moveTaskFocus(currentEl, direction){
+    var colEl = currentEl.closest('.column');
+    if(!colEl) return;
+    var cards = getTaskCardEls(colEl);
+    var curIdx = cards.indexOf(currentEl);
+
+    if(direction === 'down'){
+      if(cards[curIdx+1]){ cards[curIdx+1].focus(); }
+      else { focusColumnFallback(colEl); }
+      return;
+    }
+    if(direction === 'up'){
+      if(cards[curIdx-1]){ cards[curIdx-1].focus(); }
+      return;
+    }
+    var cols = getVisibleColumnEls();
+    var colIdx = cols.indexOf(colEl);
+    var targetCol = cols[direction === 'left' ? colIdx - 1 : colIdx + 1];
+    if(!targetCol) return;
+    var targetCards = getTaskCardEls(targetCol);
+    if(targetCards.length === 0){ focusColumnFallback(targetCol); return; }
+    var targetIdx = Math.min(Math.max(curIdx, 0), targetCards.length - 1);
+    targetCards[targetIdx].focus();
+  }
+
+  function moveFromAddButton(btnEl, direction){
+    var colEl = btnEl.closest('.column');
+    if(!colEl) return;
+    if(direction === 'up'){
+      var cards = getTaskCardEls(colEl);
+      if(cards.length){ cards[cards.length-1].focus(); }
+      return;
+    }
+    var cols = getVisibleColumnEls();
+    var colIdx = cols.indexOf(colEl);
+    var targetCol = cols[direction === 'left' ? colIdx - 1 : colIdx + 1];
+    if(!targetCol) return;
+    var targetCards = getTaskCardEls(targetCol);
+    if(targetCards.length){ targetCards[targetCards.length-1].focus(); }
+    else { focusColumnFallback(targetCol); }
+  }
+
+  function cancelPendingDelete(){
+    clearTimeout(pendingDeleteTimer);
+    pendingDeleteTimer = null;
+    ui.pendingDeleteTaskId = null;
+  }
+
+  function requestDeleteFocused(taskCardEl){
+    var taskId = taskCardEl.getAttribute('data-task-id');
+    if(ui.pendingDeleteTaskId === taskId){
+      var colEl = taskCardEl.closest('.column');
+      var listId = colEl ? colEl.getAttribute('data-col-list') : null;
+      var cards = colEl ? getTaskCardEls(colEl) : [];
+      var idx = cards.indexOf(taskCardEl);
+      var nextId = null;
+      if(cards[idx+1]) nextId = cards[idx+1].getAttribute('data-task-id');
+      else if(cards[idx-1]) nextId = cards[idx-1].getAttribute('data-task-id');
+      cancelPendingDelete();
+      animateAndDeleteTask(taskId, function(){
+        if(nextId){ focusTaskById(nextId); }
+        else if(listId){
+          var addBtn = document.querySelector('[data-add-task="' + listId + '"]');
+          if(addBtn) addBtn.focus();
+        }
+      });
+    } else {
+      cancelPendingDelete();
+      ui.pendingDeleteTaskId = taskId;
+      render();
+      focusTaskById(taskId);
+      pendingDeleteTimer = setTimeout(function(){
+        ui.pendingDeleteTaskId = null;
+        var focused = document.activeElement;
+        var keepId = (focused && focused.classList && focused.classList.contains('task-card')) ? focused.getAttribute('data-task-id') : null;
+        render();
+        if(keepId) focusTaskById(keepId);
+      }, 3000);
+    }
+  }
+
+  function openShortcutsHelp(){
+    ui.settingsOpen = true;
+    ui.confirmResetData = false;
+    render();
+    var el = document.getElementById('settings-shortcuts-section');
+    if(el && el.scrollIntoView) el.scrollIntoView({block:'start'});
+  }
+
+  function handleGlobalShortcut(e){
+    switch(e.key){
+      case '/':
+        e.preventDefault();
+        var si = document.getElementById('search-input');
+        if(si) si.focus();
+        return true;
+      case 'n': case 'N':
+        quickAddTask();
+        return true;
+      case 'm': case 'M':
+        state.view.sidebarCollapsed = !state.view.sidebarCollapsed;
+        persist(); render();
+        return true;
+      case '[':
+        var pIdx = getSectionIndex(state.view.currentSectionId);
+        if(pIdx > 0) goToSection(state.sections[pIdx - 1].id, 'prev');
+        return true;
+      case ']':
+        var nIdx = getSectionIndex(state.view.currentSectionId);
+        if(nIdx > -1 && nIdx < state.sections.length - 1) goToSection(state.sections[nIdx + 1].id, 'next');
+        return true;
+      case 'a': case 'A':
+        state.view.mode = 'all'; persist(); render();
+        return true;
+      case 'f': case 'F':
+        state.view.mode = 'starred'; persist(); render();
+        return true;
+      case '?':
+        e.preventDefault();
+        openShortcutsHelp();
+        return true;
+      case 'ArrowDown': case 'ArrowRight':
+        e.preventDefault();
+        var cols0 = getVisibleColumnEls();
+        if(cols0.length){
+          var firstCards = getTaskCardEls(cols0[0]);
+          if(firstCards.length){ firstCards[0].focus(); }
+          else { focusColumnFallback(cols0[0]); }
+        }
+        return true;
+    }
+    return false;
+  }
+
+  document.addEventListener('keydown', function(e){
+    var ae = document.activeElement;
+
+    if(ui.editingTaskId && e.key === 'Enter' && (e.metaKey || e.ctrlKey)){
+      e.preventDefault(); saveModal(); return;
+    }
+
+    if(e.key === 'Escape'){
+      if(ui.notesFullscreenOpen){ closeNotesFullscreen(); return; }
+      if(ui.editingTaskId){ closeModal(); return; }
+      if(ui.settingsOpen){ closeSettings(); return; }
+      if(ui.editingCurrentSectionTitle){ ui.editingCurrentSectionTitle=false; render(); return; }
+      if(ui.allSectionsMenuOpen){ ui.allSectionsMenuOpen=false; render(); return; }
+      if(ui.currentSectionMenuOpen){ ui.currentSectionMenuOpen=false; ui.confirmDeleteCurrentSection=false; render(); return; }
+      if(ui.openListMenuId){ ui.openListMenuId=null; ui.confirmDeleteListId=null; ui.movingListId=null; render(); return; }
+      if(ui.createMenuOpen){ ui.createMenuOpen=false; render(); return; }
+      if(ui.addingToListId){ ui.addingToListId=null; render(); return; }
+      if(ui.addingSection){ ui.addingSection=false; render(); return; }
+      if(ui.addingListToSectionId){ ui.addingListToSectionId=null; render(); return; }
+      if(ui.pendingDeleteTaskId){ cancelPendingDelete(); render(); return; }
+      if(ae && ae.classList && ae.classList.contains('task-card')){ ae.blur(); return; }
+      return;
+    }
+
+    if(isFormField(ae)) return;
+
+    var anyMenuOpen = ui.createMenuOpen || ui.allSectionsMenuOpen || ui.currentSectionMenuOpen || ui.openListMenuId || ui.movingListId;
+    if(ui.editingTaskId || ui.settingsOpen || anyMenuOpen) return;
+
+    var onTaskCard = ae && ae.classList && ae.classList.contains('task-card');
+    var onAddBtn = ae && ae.classList && ae.classList.contains('add-task-btn');
+
+    if(onTaskCard){
+      var taskId = ae.getAttribute('data-task-id');
+      if(ui.pendingDeleteTaskId && ui.pendingDeleteTaskId !== taskId){ cancelPendingDelete(); }
+      if((e.key === 'ArrowUp' || e.key === 'ArrowDown') && (e.metaKey || e.ctrlKey) && e.shiftKey){
+        e.preventDefault();
+        moveTaskWithinColumn(taskId, e.key === 'ArrowUp' ? 'up' : 'down');
+        return;
+      }
+      if(e.key === 'ArrowDown'){ e.preventDefault(); moveTaskFocus(ae, 'down'); return; }
+      if(e.key === 'ArrowUp'){ e.preventDefault(); moveTaskFocus(ae, 'up'); return; }
+      if(e.key === 'ArrowRight'){ e.preventDefault(); moveTaskFocus(ae, 'right'); return; }
+      if(e.key === 'ArrowLeft'){ e.preventDefault(); moveTaskFocus(ae, 'left'); return; }
+      if(e.key === 'Enter' || e.key === 'e' || e.key === 'E'){ openTaskModal(taskId); return; }
+      if(e.key === ' '){ e.preventDefault(); cycleTaskStatus(taskId); focusTaskById(taskId); return; }
+      if(e.key === '1'){ setTaskStatus(taskId, 'not_started'); focusTaskById(taskId); return; }
+      if(e.key === '2'){ setTaskStatus(taskId, 'in_progress'); focusTaskById(taskId); return; }
+      if(e.key === '3'){ setTaskStatus(taskId, 'completed'); focusTaskById(taskId); return; }
+      if(e.key === 'f' || e.key === 'F'){ toggleTaskStarred(taskId); focusTaskById(taskId); return; }
+      if(e.key === 'Delete' || e.key === 'Backspace'){ e.preventDefault(); requestDeleteFocused(ae); return; }
+      if(handleGlobalShortcut(e)) return;
+      return;
+    }
+
+    if(onAddBtn){
+      if(e.key === 'ArrowUp'){ e.preventDefault(); moveFromAddButton(ae, 'up'); return; }
+      if(e.key === 'ArrowLeft'){ e.preventDefault(); moveFromAddButton(ae, 'left'); return; }
+      if(e.key === 'ArrowRight'){ e.preventDefault(); moveFromAddButton(ae, 'right'); return; }
+      if(handleGlobalShortcut(e)) return;
+      return;
+    }
+
+    handleGlobalShortcut(e);
+  });
+
+  /* ================= Global listeners ================= */
+  sidebarInner.addEventListener('click', onSidebarClick);
+  sidebarInner.addEventListener('dragstart', onDragStart);
+  sidebarInner.addEventListener('dragover', onDragOver);
+  sidebarInner.addEventListener('drop', onDrop);
+  sidebarInner.addEventListener('dragend', onDragEnd);
+
+  boardEl.addEventListener('click', onBoardClick);
+  boardEl.addEventListener('dragstart', onDragStart);
+  boardEl.addEventListener('dragover', onDragOver);
+  boardEl.addEventListener('drop', onDrop);
+  boardEl.addEventListener('dragend', onDragEnd);
+
+  document.getElementById('hamburger-btn').addEventListener('click', function(){
+    state.view.sidebarCollapsed = !state.view.sidebarCollapsed;
+    persist(); render();
+  });
+  sidebarBackdrop.addEventListener('click', function(){
+    state.view.sidebarCollapsed = true; persist(); render();
+  });
+  document.getElementById('search-input').addEventListener('input', function(e){
+    ui.searchQuery = e.target.value; renderBoard();
+  });
+
+  document.addEventListener('click', function(e){
+    if(ui.allSectionsMenuOpen && !e.target.closest('.pager-title-wrap')){ ui.allSectionsMenuOpen=false; render(); }
+    else if(ui.currentSectionMenuOpen && !e.target.closest('.current-section-menu-btn')){ ui.currentSectionMenuOpen=false; ui.confirmDeleteCurrentSection=false; render(); }
+    else if(ui.openListMenuId && !e.target.closest('.list-menu-wrap')){ ui.openListMenuId=null; ui.confirmDeleteListId=null; ui.movingListId=null; render(); }
+    else if(ui.createMenuOpen && !e.target.closest('#create-btn')){ ui.createMenuOpen=false; render(); }
+  });
+
+  /* ================= Init ================= */
+  loadState().then(function(){
+    applyTheme();
+    render();
+  });
+})();
+</script>
+</body>
+</html>
